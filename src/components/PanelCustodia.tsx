@@ -11,6 +11,9 @@ import {
   Search,
   Eye,
   X,
+  FileText,
+  Printer,
+  ArrowUpRight,
 } from 'lucide-react';
 import type { ObjetoCustodia } from '../types/campus';
 
@@ -29,6 +32,20 @@ interface AlertaExtravio {
   estado: 'ACTIVA' | 'EN_REVISION' | 'RESUELTA';
   nota_admin?: string;
   created_at?: string;
+}
+
+interface DatosActaRestitucion {
+  numero_acta: string;
+  radicado_id: string;
+  titulo_bien: string;
+  categoria: string;
+  sede: string;
+  edificio: string;
+  nombre_reclamante: string;
+  id_institucional: string;
+  correo_reclamante: string;
+  observaciones_entrega: string;
+  fecha_hora: string;
 }
 
 interface PanelCustodiaProps {
@@ -112,6 +129,17 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
   const [procesandoAlertaId, setProcesandoAlertaId] = useState<string | null>(null);
   const [fotoModal, setFotoModal] = useState<string | null>(null);
   const [filtroInventario, setFiltroInventario] = useState('');
+
+  // Estados para Modal de Acta Digital de Restitución
+  const [objetoParaActa, setObjetoParaActa] = useState<ObjetoCustodia | null>(null);
+  const [formReclamante, setFormReclamante] = useState({
+    nombre_reclamante: '',
+    id_institucional: '',
+    correo_reclamante: '',
+    observaciones_entrega: 'Validación presencial con carné institucional y descripción física conforme.',
+  });
+  const [actaGenerada, setActaGenerada] = useState<DatosActaRestitucion | null>(null);
+  const [procesandoRestitucion, setProcesandoRestitucion] = useState(false);
 
   const cargarAlertas = async () => {
     setCargandoAlertas(true);
@@ -210,6 +238,25 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
     }
   };
 
+  const prellenarDesdeAlerta = (alerta: AlertaExtravio) => {
+    setNuevoObjeto({
+      titulo: alerta.titulo,
+      categoria: CATEGORIAS.includes(alerta.categoria) ? alerta.categoria : 'OTROS',
+      sede: SEDES_UNIMINUTO.includes(alerta.sede) ? alerta.sede : 'Sede Principal',
+      edificio: alerta.lugar_aproximado || 'Portería Principal',
+      marca: '',
+      modelo: alerta.descripcion || '',
+      color: '',
+      numero_serie: '',
+      imagen_url: alerta.foto_referencia || '',
+    });
+    setMensajeForm({
+      tipo: 'ok',
+      texto: `Datos precargados desde la alerta ${alerta.codigo_alerta}. Ajusta o completa la ficha y publica.`,
+    });
+    setTabActiva('registro');
+  };
+
   const gestionarAlerta = async (
     alerta: AlertaExtravio,
     nuevoEstado: 'EN_REVISION' | 'RESUELTA'
@@ -243,28 +290,150 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
     }
   };
 
-  const restituirBien = async (obj: ObjetoCustodia) => {
-    const targetId = obj._id || obj.radicado_id;
+  const abrirModalActa = (obj: ObjetoCustodia) => {
+    setObjetoParaActa(obj);
+    setFormReclamante({
+      nombre_reclamante: '',
+      id_institucional: '',
+      correo_reclamante: '',
+      observaciones_entrega:
+        'Validación presencial con carné institucional y descripción física conforme.',
+    });
+  };
+
+  const confirmarRestitucionConActa = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!objetoParaActa) return;
+
+    setProcesandoRestitucion(true);
+    const targetId = objetoParaActa._id || objetoParaActa.radicado_id;
+    const numeroActa = `ACTA-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
+    const fechaHora = new Date().toLocaleString('es-CO', {
+      dateStyle: 'long',
+      timeStyle: 'short',
+    });
+
     try {
       if (onRestituirObjeto) {
         await onRestituirObjeto(targetId);
-        return;
-      }
-      const res = await fetch('/api/objetos', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: targetId,
-          radicado_id: obj.radicado_id,
-          estado: 'RESTITUIDO',
-        }),
-      });
-      if (res.ok) {
+      } else {
+        await fetch('/api/objetos', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: targetId,
+            radicado_id: objetoParaActa.radicado_id,
+            estado: 'RESTITUIDO',
+          }),
+        });
         onRecargarObjetos?.();
       }
+
+      setActaGenerada({
+        numero_acta: numeroActa,
+        radicado_id: objetoParaActa.radicado_id,
+        titulo_bien: objetoParaActa.titulo,
+        categoria: String(objetoParaActa.categoria),
+        sede: objetoParaActa.sede,
+        edificio: objetoParaActa.edificio || 'Portería Principal',
+        nombre_reclamante: formReclamante.nombre_reclamante.trim(),
+        id_institucional: formReclamante.id_institucional.trim(),
+        correo_reclamante: formReclamante.correo_reclamante.trim(),
+        observaciones_entrega: formReclamante.observaciones_entrega.trim(),
+        fecha_hora: fechaHora,
+      });
+      setObjetoParaActa(null);
     } catch (err) {
-      console.error('Error restituyendo bien:', err);
+      console.error('Error generando acta de restitución:', err);
+    } finally {
+      setProcesandoRestitucion(false);
     }
+  };
+
+  const imprimirActaPDF = (acta: DatosActaRestitucion) => {
+    const ventana = window.open('', '_blank', 'width=820,height=920');
+    if (!ventana) return;
+
+    ventana.document.write(`
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8" />
+        <title>${acta.numero_acta} • Acta de Restitución FindCampus</title>
+        <style>
+          body { font-family: Arial, Helvetica, sans-serif; color: #0f172a; margin: 36px; line-height: 1.5; }
+          .header { border-bottom: 3px solid #0e1e38; padding-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
+          .badge { background: #facc15; color: #090d16; font-weight: bold; padding: 4px 10px; border-radius: 6px; font-size: 12px; }
+          h1 { font-size: 20px; margin: 6px 0 0; color: #0e1e38; }
+          .meta { font-size: 12px; color: #475569; }
+          .box { border: 1px solid #cbd5e1; border-radius: 10px; padding: 16px; margin-top: 18px; background: #f8fafc; }
+          .box h3 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; color: #0e1e38; letter-spacing: 0.5px; }
+          table { width: 100%; border-collapse: collapse; font-size: 13px; }
+          td { padding: 6px 4px; vertical-align: top; }
+          td.label { width: 34%; font-weight: bold; color: #334155; }
+          .legal { margin-top: 20px; font-size: 11px; color: #475569; text-align: justify; }
+          .firmas { margin-top: 56px; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; text-align: center; font-size: 12px; }
+          .linea { border-top: 1px solid #0f172a; padding-top: 6px; }
+          @media print { body { margin: 20px; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <span class="badge">UNIMINUTO • FINDCAMPUS</span>
+            <h1>ACTA DIGITAL DE RESTITUCIÓN DE BIEN</h1>
+          </div>
+          <div class="meta" style="text-align: right;">
+            <strong>N.º Acta:</strong> ${acta.numero_acta}<br/>
+            <strong>Radicado:</strong> ${acta.radicado_id}<br/>
+            <strong>Fecha:</strong> ${acta.fecha_hora}
+          </div>
+        </div>
+
+        <div class="box">
+          <h3>1. Identificación del Bien Restituido</h3>
+          <table>
+            <tr><td class="label">Descripción del Bien:</td><td>${acta.titulo_bien}</td></tr>
+            <tr><td class="label">Categoría:</td><td>${acta.categoria}</td></tr>
+            <tr><td class="label">Sede / Punto de Custodia:</td><td>${acta.sede} • ${acta.edificio}</td></tr>
+            <tr><td class="label">Estado Final:</td><td><strong>RESTITUIDO A TITULAR</strong></td></tr>
+          </table>
+        </div>
+
+        <div class="box">
+          <h3>2. Datos del Titular / Reclamante</h3>
+          <table>
+            <tr><td class="label">Nombre Completo:</td><td>${acta.nombre_reclamante}</td></tr>
+            <tr><td class="label">ID Institucional / Cédula:</td><td>${acta.id_institucional}</td></tr>
+            <tr><td class="label">Correo de Contacto:</td><td>${acta.correo_reclamante || 'No registrado'}</td></tr>
+            <tr><td class="label">Validación de Custodia:</td><td>${acta.observaciones_entrega}</td></tr>
+          </table>
+        </div>
+
+        <p class="legal">
+          <strong>Declaración y Protección de Datos (Ley 1581 de 2012):</strong> El reclamante declara recibir a entera satisfacción el bien descrito anteriormente, acreditando su titularidad ante el personal de Seguridad y Bienestar Universitario de UNIMINUTO. Los datos personales recolectados se tratan exclusivamente para fines de trazabilidad y auditoría institucional.
+        </p>
+
+        <div class="firmas">
+          <div class="linea">
+            <strong>${acta.nombre_reclamante}</strong><br/>
+            ID: ${acta.id_institucional}<br/>
+            Firma del Reclamante
+          </div>
+          <div class="linea">
+            <strong>Custodia y Seguridad Campus</strong><br/>
+            UNIMINUTO • ${acta.sede}<br/>
+            Funcionario que Entrega
+          </div>
+        </div>
+
+        <script>
+          window.onload = function() { window.print(); };
+        </script>
+      </body>
+      </html>
+    `);
+    ventana.document.close();
   };
 
   const alertasPendientesCount = alertas.filter((a) => a.estado !== 'RESUELTA').length;
@@ -276,7 +445,7 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
   });
 
   return (
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <section className="space-y-6">
       {/* Cabecera del Panel de Custodia */}
       <div className="rounded-3xl bg-[#0e1e38] border border-blue-900/50 p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 shadow-xl">
         <div>
@@ -341,7 +510,7 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
             }`}
           >
             <PackageCheck className="w-4 h-4" />
-            <span>Inventario y Entregas ({objetos.length})</span>
+            <span>Inventario y Actas ({objetos.length})</span>
           </button>
         </div>
       </div>
@@ -494,7 +663,6 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
             </div>
           </div>
 
-          {/* Captura Fotográfica Real (Cámara móvil o archivo) */}
           <div className="space-y-2">
             <label className="block text-xs font-bold text-slate-300">
               Evidencia Fotográfica del Bien (Cámara o Galería)
@@ -550,19 +718,17 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
         </form>
       )}
 
-      {/* TAB 2: BANDEJA UNIFICADA DE ALERTAS TEMPRANAS Y CORREOS */}
+      {/* TAB 2: BANDEJA UNIFICADA DE ALERTAS TEMPRANAS */}
       {tabActiva === 'alertas' && (
         <div className="rounded-3xl bg-[#0e1e38] border border-blue-900/50 p-6 space-y-5 shadow-xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-extrabold text-white">
-                Bitácora de Alertas Tempranas de Estudiantes
-              </h3>
-              <p className="text-xs text-slate-300">
-                Procesa reportes activos o notifica hallazgo por correo electrónico con acta
-                automática.
-              </p>
-            </div>
+          <div>
+            <h3 className="text-lg font-extrabold text-white">
+              Bitácora de Alertas Tempranas de Estudiantes
+            </h3>
+            <p className="text-xs text-slate-300">
+              Procesa reportes activos, precarga el hallazgo en custodia o notifica por
+              correo electrónico.
+            </p>
           </div>
 
           {cargandoAlertas ? (
@@ -647,6 +813,15 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
                         </button>
                       )}
 
+                      <button
+                        type="button"
+                        onClick={() => prellenarDesdeAlerta(alerta)}
+                        className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 cursor-pointer"
+                      >
+                        <ArrowUpRight className="w-3.5 h-3.5 text-yellow-400" />
+                        <span>Pasar a Custodia</span>
+                      </button>
+
                       {alerta.estado !== 'RESUELTA' && (
                         <>
                           {alerta.estado === 'ACTIVA' && (
@@ -669,9 +844,7 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" />
                             <span>
-                              {procesando
-                                ? 'Enviando correo...'
-                                : 'Notificar Hallazgo y Acta'}
+                              {procesando ? 'Enviando...' : 'Notificar Hallazgo'}
                             </span>
                           </button>
                         </>
@@ -685,13 +858,19 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
         </div>
       )}
 
-      {/* TAB 3: INVENTARIO Y RESTITUCIÓN CON ACTA DIGITAL */}
+      {/* TAB 3: INVENTARIO Y ACTAS DIGITALES DE RESTITUCIÓN */}
       {tabActiva === 'custodia' && (
         <div className="rounded-3xl bg-[#0e1e38] border border-blue-900/50 p-6 space-y-5 shadow-xl">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <h3 className="text-lg font-extrabold text-white">
-              Control de Custodia y Entregas
-            </h3>
+            <div>
+              <h3 className="text-lg font-extrabold text-white">
+                Control de Custodia y Actas de Entrega
+              </h3>
+              <p className="text-xs text-slate-300">
+                Registra los datos del reclamante para generar el comprobante oficial en
+                PDF.
+              </p>
+            </div>
             <div className="relative w-full sm:w-72">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
@@ -712,7 +891,7 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
                   <th className="px-4 py-3">Bien</th>
                   <th className="px-4 py-3">Sede</th>
                   <th className="px-4 py-3">Estado</th>
-                  <th className="px-4 py-3 rounded-r-xl text-right">Acción</th>
+                  <th className="px-4 py-3 rounded-r-xl text-right">Acta Digital</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-blue-950">
@@ -723,24 +902,245 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
                     </td>
                     <td className="px-4 py-3 font-semibold text-white">{obj.titulo}</td>
                     <td className="px-4 py-3">{obj.sede}</td>
-                    <td className="px-4 py-3">{obj.estado}</td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                          obj.estado === 'RESTITUIDO'
+                            ? 'bg-slate-800 text-slate-300'
+                            : obj.estado === 'EN_VALIDACION'
+                            ? 'bg-amber-500/20 text-amber-300'
+                            : 'bg-emerald-500/20 text-emerald-300'
+                        }`}
+                      >
+                        {obj.estado}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-right">
                       {obj.estado !== 'RESTITUIDO' ? (
                         <button
                           type="button"
-                          onClick={() => restituirBien(obj)}
-                          className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold cursor-pointer"
+                          onClick={() => abrirModalActa(obj)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold cursor-pointer"
                         >
-                          Restituir con Acta
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>Restituir con Acta</span>
                         </button>
                       ) : (
-                        <span className="text-slate-500 font-semibold">Entregado</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            imprimirActaPDF({
+                              numero_acta: `ACTA-${obj.radicado_id.replace('FIND-', '')}`,
+                              radicado_id: obj.radicado_id,
+                              titulo_bien: obj.titulo,
+                              categoria: String(obj.categoria),
+                              sede: obj.sede,
+                              edificio: obj.edificio || 'Portería Principal',
+                              nombre_reclamante: 'Titular Validado en Custodia',
+                              id_institucional: 'Verificado en Portería',
+                              correo_reclamante: '',
+                              observaciones_entrega:
+                                'Bien restituido conforme a protocolo institucional UNIMINUTO.',
+                              fecha_hora: new Date().toLocaleString('es-CO'),
+                            })
+                          }
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-950 hover:bg-blue-900 text-yellow-300 font-bold cursor-pointer"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          <span>Imprimir Copia</span>
+                        </button>
                       )}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 1: FORMULARIO PARA GENERAR ACTA DE RESTITUCIÓN */}
+      {objetoParaActa && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-[#0e1e38] border border-yellow-400/40 shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 bg-[#081326] border-b border-blue-900/60 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-yellow-400">
+                  ACTA DIGITAL • LEY 1581
+                </span>
+                <h3 className="text-base font-extrabold text-white">
+                  Restituir: {objetoParaActa.titulo} ({objetoParaActa.radicado_id})
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setObjetoParaActa(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={confirmarRestitucionConActa} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">
+                  Nombre Completo del Reclamante *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formReclamante.nombre_reclamante}
+                  onChange={(e) =>
+                    setFormReclamante({
+                      ...formReclamante,
+                      nombre_reclamante: e.target.value,
+                    })
+                  }
+                  placeholder="Ej. Laura Camila Gómez"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#081326] border border-blue-900/60 focus:border-yellow-400 text-sm text-white outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    ID Institucional / Cédula *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formReclamante.id_institucional}
+                    onChange={(e) =>
+                      setFormReclamante({
+                        ...formReclamante,
+                        id_institucional: e.target.value,
+                      })
+                    }
+                    placeholder="Ej. 000784512"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#081326] border border-blue-900/60 focus:border-yellow-400 text-sm text-white outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Correo del Reclamante
+                  </label>
+                  <input
+                    type="email"
+                    value={formReclamante.correo_reclamante}
+                    onChange={(e) =>
+                      setFormReclamante({
+                        ...formReclamante,
+                        correo_reclamante: e.target.value,
+                      })
+                    }
+                    placeholder="estudiante@uniminuto.edu.co"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#081326] border border-blue-900/60 focus:border-yellow-400 text-sm text-white outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">
+                  Observaciones de Validación Presencial
+                </label>
+                <textarea
+                  rows={2}
+                  value={formReclamante.observaciones_entrega}
+                  onChange={(e) =>
+                    setFormReclamante({
+                      ...formReclamante,
+                      observaciones_entrega: e.target.value,
+                    })
+                  }
+                  className="w-full px-3.5 py-2 rounded-xl bg-[#081326] border border-blue-900/60 focus:border-yellow-400 text-xs text-white outline-none"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setObjetoParaActa(null)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:bg-blue-950 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={procesandoRestitucion}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-extrabold text-xs sm:text-sm cursor-pointer"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>
+                    {procesandoRestitucion
+                      ? 'Generando acta...'
+                      : 'Firmar y Generar Acta'}
+                  </span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: VISTA PREVIA E IMPRESIÓN PDF DEL ACTA GENERADA */}
+      {actaGenerada && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-[#0e1e38] border border-emerald-400/40 shadow-2xl p-6 space-y-5">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 className="w-7 h-7 text-emerald-400 shrink-0" />
+                <div>
+                  <h3 className="text-lg font-extrabold text-white">
+                    Acta Digital Generada
+                  </h3>
+                  <p className="text-xs font-mono text-yellow-400">
+                    {actaGenerada.numero_acta} • Radicado {actaGenerada.radicado_id}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActaGenerada(null)}
+                className="p-1 text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="rounded-2xl bg-[#081326] border border-blue-900/50 p-4 space-y-2 text-xs text-slate-300">
+              <p>
+                <strong>Bien entregado:</strong> {actaGenerada.titulo_bien}
+              </p>
+              <p>
+                <strong>Sede:</strong> {actaGenerada.sede} ({actaGenerada.edificio})
+              </p>
+              <p>
+                <strong>Reclamante:</strong> {actaGenerada.nombre_reclamante} (ID:{' '}
+                {actaGenerada.id_institucional})
+              </p>
+              <p>
+                <strong>Fecha y hora:</strong> {actaGenerada.fecha_hora}
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setActaGenerada(null)}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:bg-blue-950 cursor-pointer"
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={() => imprimirActaPDF(actaGenerada)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-extrabold text-xs sm:text-sm cursor-pointer"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Imprimir / Guardar PDF</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
