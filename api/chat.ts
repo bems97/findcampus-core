@@ -20,8 +20,9 @@ function censurarSerial(valor?: string): string {
 }
 
 async function llamarGemini(modelo: string, payload: object) {
+  const nombreModelo = modelo.startsWith('models/') ? modelo : `models/${modelo}`;
   return fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${encodeURIComponent(geminiApiKey)}`,
+    `https://generativelanguage.googleapis.com/v1beta/${nombreModelo}:generateContent?key=${encodeURIComponent(geminiApiKey)}`,
     {
       method: 'POST',
       headers: {
@@ -31,6 +32,30 @@ async function llamarGemini(modelo: string, payload: object) {
       body: JSON.stringify(payload),
     }
   );
+}
+
+async function obtenerModeloDisponible(): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(geminiApiKey)}`,
+      { headers: { 'x-goog-api-key': geminiApiKey } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const modelos = Array.isArray(data?.models) ? data.models : [];
+    const valido =
+      modelos.find(
+        (m: { name?: string; supportedGenerationMethods?: string[] }) =>
+          m.name?.includes('flash') &&
+          m.supportedGenerationMethods?.includes('generateContent')
+      ) ||
+      modelos.find((m: { supportedGenerationMethods?: string[] }) =>
+        m.supportedGenerationMethods?.includes('generateContent')
+      );
+    return valido?.name || null;
+  } catch {
+    return null;
+  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -121,9 +146,12 @@ ${resumenInventario}`;
       },
     };
 
-let geminiRes = await llamarGemini('gemini-3.8-flash', payload);
+    let geminiRes = await llamarGemini('gemini-3.8-flash', payload);
     if (!geminiRes.ok) {
-      geminiRes = await llamarGemini('gemini-3.8-flash-lite', payload);
+      const modeloDetectado = await obtenerModeloDisponible();
+      if (modeloDetectado) {
+        geminiRes = await llamarGemini(modeloDetectado, payload);
+      }
     }
 
     if (!geminiRes.ok) {
