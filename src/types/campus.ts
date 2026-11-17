@@ -1,32 +1,52 @@
-export type CategoriaObjeto = 'ELECTRONICA' | 'BILLETERA' | 'DOCUMENTOS' | 'ACCESORIOS';
+export type RolUsuario = 'ESTUDIANTE' | 'ADMIN';
 
-export interface AtributosPolimorficos {
-  // Electrónica
+export type CategoriaObjeto =
+  | 'ELECTRONICA'
+  | 'DOCUMENTOS'
+  | 'ACCESORIOS'
+  | 'LIBROS_UTILES'
+  | 'OTROS';
+
+export type EstadoObjeto = 'EN_CUSTODIA' | 'EN_VALIDACION' | 'RESTITUIDO';
+
+export interface AtributosObjeto {
   marca?: string;
   modelo?: string;
-  numero_serie?: string;
-  incluye_cargador?: boolean;
-  // Billetera
-  material?: string;
   color?: string;
-  cantidad_documentos?: number;
-  contiene_efectivo?: boolean;
-  // Documentos / Accesorios
-  tipo_documento?: string;
-  titular_enmascarado?: string;
-  descripcion_detalle?: string;
+  numero_serie?: string;
+  documento_identidad?: string;
+  observaciones?: string;
+  [key: string]: unknown;
 }
 
 export interface ObjetoCustodia {
-  _id: string;
+  _id?: string;
   radicado_id: string;
-  categoria: CategoriaObjeto;
   titulo: string;
-  sede: 'Sede Principal' | 'Sede Sur' | 'Sede Norte';
-  edificio: string;
-  fecha_hallazgo: string;
-  estado: 'EN_CUSTODIA' | 'EN_VALIDACION' | 'RESTITUIDO';
-  evidencia_lake_url: string;
-  hash_sha256: string;
-  atributos: AtributosPolimorficos;
+  categoria: CategoriaObjeto | string;
+  sede: string;
+  edificio?: string;
+  estado: EstadoObjeto;
+  fecha_hallazgo?: string;
+  imagen_url?: string;
+  atributos?: AtributosObjeto;
+  metadatos?: AtributosObjeto;
+  [key: string]: unknown;
+}
+
+export interface AlertaTemprana {
+  _id?: string;
+  codigo_alerta: string;
+  titulo: string;
+  categoria: string;
+  descripcion?: string;
+  sede: string;
+  lugar_aproximado?: string;
+  nombre_estudiante: string;
+  correo_estudiante: string;
+  telefono_contacto?: string;
+  foto_referencia?: string | null;
+  estado: 'ACTIVA' | 'EN_REVISION' | 'RESUELTA';
+  nota_admin?: string;
+  created_at?: string;
 }
