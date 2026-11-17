@@ -19,7 +19,7 @@ function censurarSerial(valor?: string): string {
   return `${valor.slice(0, 2)}****${valor.slice(-2)}`;
 }
 
-async function llamarGemini(modelo: string, payload: object) {
+async function llamarGemini(modelo: string, payload: object, timeoutMs = 4000) {
   const nombreModelo = modelo.startsWith('models/') ? modelo : `models/${modelo}`;
   return fetch(
     `https://generativelanguage.googleapis.com/v1beta/${nombreModelo}:generateContent?key=${encodeURIComponent(geminiApiKey)}`,
@@ -30,34 +30,39 @@ async function llamarGemini(modelo: string, payload: object) {
         'x-goog-api-key': geminiApiKey,
       },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(timeoutMs),
     }
   );
 }
 
-async function obtenerModelosActivos(): Promise<string[]> {
+async function obtenerFlashActivo(): Promise<string | null> {
   try {
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(geminiApiKey)}`,
-      { headers: { 'x-goog-api-key': geminiApiKey } }
+      {
+        headers: { 'x-goog-api-key': geminiApiKey },
+        signal: AbortSignal.timeout(2500),
+      }
     );
-    if (!res.ok) return [];
+    if (!res.ok) return null;
     const data = await res.json();
     const modelos: { name?: string; supportedGenerationMethods?: string[] }[] =
       Array.isArray(data?.models) ? data.models : [];
 
-    return modelos
-      .filter(
-        (m) =>
-          m.name &&
-          m.supportedGenerationMethods?.includes('generateContent') &&
-          !m.name.includes('2.5') &&
-          !m.name.includes('2.0') &&
-          !m.name.includes('1.5') &&
-          !m.name.includes('embedding')
-      )
-      .map((m) => m.name as string);
+    const flash = modelos.find(
+      (m) =>
+        m.name &&
+        m.name.includes('flash') &&
+        !m.name.includes('3.8-flash') &&
+        !m.name.includes('2.5') &&
+        !m.name.includes('2.0') &&
+        !m.name.includes('1.5') &&
+        m.supportedGenerationMethods?.includes('generateContent')
+    );
+
+    return flash?.name || null;
   } catch {
-    return [];
+    return null;
   }
 }
 
@@ -142,25 +147,34 @@ ${resumenInventario}`;
         },
       };
 
-      // Intentar con gemini-3.8-flash y rotar entre todos los modelos activos si hay alta demanda (503/429)
-      const disponibles = await obtenerModelosActivos();
-      const candidatos = Array.from(
-        new Set(['models/gemini-3.8-flash', ...disponibles])
-      );
-
-      for (const modelo of candidatos) {
-        const geminiRes = await llamarGemini(modelo, payload);
-        if (geminiRes.ok) {
-          const data = await geminiRes.json();
+      // Máximo 2 intentos rápidos (4s + 3.5s) para nunca agotar el límite de 10s de Vercel
+      try {
+        const res1 = await llamarGemini('models/gemini-3.8-flash', payload, 4000);
+        if (res1.ok) {
+          const data = await res1.json();
           const respuesta = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (respuesta) {
-            return res.status(200).json({ respuesta });
+          if (respuesta) return res.status(200).json({ respuesta });
+        }
+      } catch {
+        // Timeout o fallo puntual, pasamos al segundo modelo flash
+      }
+
+      const otroFlash = await obtenerFlashActivo();
+      if (otroFlash) {
+        try {
+          const res2 = await llamarGemini(otroFlash, payload, 3500);
+          if (res2.ok) {
+            const data = await res2.json();
+            const respuesta = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (respuesta) return res.status(200).json({ respuesta });
           }
+        } catch {
+          // Pasamos al respaldo instantáneo sobre MongoDB
         }
       }
     }
 
-    // Respaldo inteligente directo si todos los modelos de Gemini tienen saturación temporal
+    // Respaldo instantáneo directo sobre el inventario institucional
     const consulta = mensaje.toLowerCase();
     const coincidencias = objetosCustodia.filter((obj) => {
       const textoObj = `${obj.titulo} ${obj.categoria} ${obj.sede} ${obj.edificio} ${JSON.stringify(obj.atributos || {})}`.toLowerCase();
