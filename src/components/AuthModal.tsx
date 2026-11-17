@@ -64,7 +64,7 @@ export function AuthModal({ abierto, onCerrar, onAutenticado }: AuthModalProps) 
         setClaveAdmin('');
       }
     } catch {
-      setError('Error de red al conectar con MongoDB Atlas.');
+      setError('No fue posible conectar con el servidor. Intenta de nuevo.');
     } finally {
       setCargando(false);
     }
@@ -78,12 +78,12 @@ export function AuthModal({ abierto, onCerrar, onAutenticado }: AuthModalProps) 
           <div className="flex items-center gap-2.5">
             <ShieldCheck className="w-5 h-5 text-amber-400" />
             <h2 className="font-bold text-zinc-100 text-sm tracking-wide">
-              IDENTIDAD Y ACCESO RBAC
+              PORTAL DE ACCESO INSTITUCIONAL
             </h2>
           </div>
           <button
             onClick={onCerrar}
-            className="text-zinc-400 hover:text-zinc-100 p-1 rounded-lg hover:bg-zinc-800"
+            className="text-zinc-400 hover:text-zinc-100 p-1 rounded-lg hover:bg-zinc-800 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -97,7 +97,7 @@ export function AuthModal({ abierto, onCerrar, onAutenticado }: AuthModalProps) 
               setModo('LOGIN');
               setError('');
             }}
-            className={`py-3 text-xs font-semibold flex items-center justify-center gap-2 transition-colors ${
+            className={`py-3 text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer ${
               modo === 'LOGIN'
                 ? 'bg-amber-400 text-zinc-950'
                 : 'text-zinc-400 hover:text-zinc-200'
@@ -112,14 +112,14 @@ export function AuthModal({ abierto, onCerrar, onAutenticado }: AuthModalProps) 
               setModo('REGISTER');
               setError('');
             }}
-            className={`py-3 text-xs font-semibold flex items-center justify-center gap-2 transition-colors ${
+            className={`py-3 text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer ${
               modo === 'REGISTER'
                 ? 'bg-amber-400 text-zinc-950'
                 : 'text-zinc-400 hover:text-zinc-200'
             }`}
           >
             <UserPlus className="w-4 h-4" />
-            Crear Cuenta en BD
+            Registrarse
           </button>
         </div>
 
@@ -156,7 +156,7 @@ export function AuthModal({ abierto, onCerrar, onAutenticado }: AuthModalProps) 
                     <input
                       type="text"
                       required
-                      placeholder="Ej. 000845120"
+                      placeholder="Ej. 474909"
                       value={codigo}
                       onChange={(e) => setCodigo(e.target.value)}
                       className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
@@ -165,14 +165,14 @@ export function AuthModal({ abierto, onCerrar, onAutenticado }: AuthModalProps) 
                 </div>
 
                 <div>
-                  <label className="block text-xs text-zinc-400 mb-1">Rol en Campus</label>
+                  <label className="block text-xs text-zinc-400 mb-1">Perfil</label>
                   <select
                     value={rol}
                     onChange={(e) => setRol(e.target.value as 'ESTUDIANTE' | 'ADMIN')}
                     className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
                   >
                     <option value="ESTUDIANTE">Estudiante</option>
-                    <option value="ADMIN">Admin / Custodia</option>
+                    <option value="ADMIN">Vigilancia / Custodia</option>
                   </select>
                 </div>
               </div>
@@ -180,12 +180,12 @@ export function AuthModal({ abierto, onCerrar, onAutenticado }: AuthModalProps) 
               {rol === 'ADMIN' && (
                 <div>
                   <label className="block text-xs text-amber-400 mb-1">
-                    Clave Maestra de Seguridad (Demo: UNIMINUTO-ADMIN)
+                    Código de Autorización de Seguridad
                   </label>
                   <input
                     type="password"
                     required
-                    placeholder="Ingresa código de autorización"
+                    placeholder="Ingresa el código institucional"
                     value={claveAdmin}
                     onChange={(e) => setClaveAdmin(e.target.value)}
                     className="w-full bg-zinc-900 border border-amber-500/40 rounded-xl px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
@@ -229,13 +229,13 @@ export function AuthModal({ abierto, onCerrar, onAutenticado }: AuthModalProps) 
           <button
             type="submit"
             disabled={cargando}
-            className="w-full py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold text-sm transition-colors disabled:opacity-50"
+            className="w-full py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold text-sm transition-colors disabled:opacity-50 cursor-pointer"
           >
             {cargando
-              ? 'Conectando con MongoDB Atlas...'
+              ? 'Validando credenciales...'
               : modo === 'LOGIN'
-              ? 'Autenticar Sesión'
-              : 'Registrar Usuario en MongoDB'}
+              ? 'Ingresar al Sistema'
+              : 'Crear Cuenta Institucional'}
           </button>
         </form>
       </div>
