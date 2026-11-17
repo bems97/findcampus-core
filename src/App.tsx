@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Navbar, type VistaActiva, type RolUsuario } from './components/Navbar';
 import { CatalogoPublico } from './components/CatalogoPublico';
 import { PanelCustodia } from './components/PanelCustodia';
@@ -13,20 +13,58 @@ export function App() {
   const [vistaActiva, setVistaActiva] = useState<VistaActiva>('CATALOGO');
   const [objetos, setObjetos] = useState<ObjetoCustodia[]>(INVENTARIO_INICIAL);
 
-  const registrarObjeto = (nuevo: ObjetoCustodia) => {
+  // Cargar datos reales desde MongoDB Atlas al iniciar
+  useEffect(() => {
+    fetch('/api/objetos')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: ObjetoCustodia[] | null) => {
+        if (data && data.length > 0) {
+          setObjetos(data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const registrarObjeto = async (nuevo: ObjetoCustodia) => {
     setObjetos((prev) => [nuevo, ...prev]);
+    try {
+      const res = await fetch('/api/objetos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nuevo),
+      });
+      if (res.ok) {
+        const guardado: ObjetoCustodia = await res.json();
+        setObjetos((prev) =>
+          prev.map((item) => (item.radicado_id === guardado.radicado_id ? guardado : item))
+        );
+      }
+    } catch (error) {
+      console.error('Error guardando en MongoDB:', error);
+    }
+  };
+
+  const actualizarEstadoNube = async (objetoId: string, nuevoEstado: ObjetoCustodia['estado']) => {
+    setObjetos((prev) =>
+      prev.map((obj) => (obj._id === objetoId ? { ...obj, estado: nuevoEstado } : obj))
+    );
+    try {
+      await fetch('/api/objetos', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: objetoId, estado: nuevoEstado }),
+      });
+    } catch (error) {
+      console.error('Error actualizando estado en MongoDB:', error);
+    }
   };
 
   const solicitarReclamo = (objetoId: string) => {
-    setObjetos((prev) =>
-      prev.map((obj) => (obj._id === objetoId ? { ...obj, estado: 'EN_VALIDACION' } : obj))
-    );
+    actualizarEstadoNube(objetoId, 'EN_VALIDACION');
   };
 
   const restituirObjeto = (objetoId: string) => {
-    setObjetos((prev) =>
-      prev.map((obj) => (obj._id === objetoId ? { ...obj, estado: 'RESTITUIDO' } : obj))
-    );
+    actualizarEstadoNube(objetoId, 'RESTITUIDO');
   };
 
   const totalEnCustodia = objetos.filter((o) => o.estado === 'EN_CUSTODIA').length;
@@ -57,7 +95,7 @@ export function App() {
       </main>
 
       <footer className="bg-zinc-950/90 border-t border-zinc-800/80 py-5 text-center text-xs text-zinc-500">
-        FindCampus.core • Arquitectura NoSQL (MongoDB) &amp; Data Lake (MinIO S3) • Seguridad RBAC &amp; Ley 1581
+        FindCampus.core • Persistencia Real MongoDB Atlas &amp; Data Lake • Seguridad RBAC &amp; Ley 1581
       </footer>
 
       <AsistenteIA objetos={objetos} />
