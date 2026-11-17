@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Navbar, type VistaActiva } from './components/Navbar';
-import { CatalogoPublico } from './components/CatalogoPublico';
+import { CatalogoPublico, type DatosReclamante } from './components/CatalogoPublico';
 import { PanelCustodia } from './components/PanelCustodia';
 import { GestionUsuarios } from './components/GestionUsuarios';
 import { DataLakeBI } from './components/DataLakeBI';
@@ -68,7 +68,11 @@ export function App() {
     }
   };
 
-  const actualizarEstadoNube = async (objetoId: string, nuevoEstado: ObjetoCustodia['estado']) => {
+  const actualizarEstadoNube = async (
+    objetoId: string,
+    nuevoEstado: ObjetoCustodia['estado'],
+    reclamante?: DatosReclamante
+  ) => {
     setObjetos((prev) =>
       prev.map((obj) =>
         obj._id === objetoId || obj.radicado_id === objetoId
@@ -80,15 +84,15 @@ export function App() {
       await fetch('/api/objetos', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: objetoId, estado: nuevoEstado }),
+        body: JSON.stringify({ id: objetoId, estado: nuevoEstado, reclamante }),
       });
     } catch (error) {
       console.error('Error actualizando estado:', error);
     }
   };
 
-  const solicitarReclamo = (objetoId: string) => {
-    actualizarEstadoNube(objetoId, 'EN_VALIDACION');
+  const solicitarReclamo = (objetoId: string, reclamante?: DatosReclamante) => {
+    actualizarEstadoNube(objetoId, 'EN_VALIDACION', reclamante);
   };
 
   const restituirObjeto = (objetoId: string) => {
@@ -126,7 +130,9 @@ export function App() {
         {rol === 'ADMIN' && vistaActiva === 'USUARIOS' && (
           <GestionUsuarios usuarioActual={usuario} />
         )}
-        {rol === 'ADMIN' && vistaActiva === 'DATALAKE' && <DataLakeBI objetos={objetos} />}
+        {rol === 'ADMIN' && vistaActiva === 'DATALAKE' && (
+          <DataLakeBI objetos={objetos} usuarioActual={usuario} />
+        )}
         {rol === 'ADMIN' && vistaActiva === 'API' && <ApiInspector objetos={objetos} />}
       </main>
 

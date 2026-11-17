@@ -12,8 +12,16 @@ import {
   Lock,
   Send,
   SlidersHorizontal,
+  UserCheck,
 } from 'lucide-react';
 import type { ObjetoCustodia } from '../types/campus';
+
+export interface DatosReclamante {
+  nombre: string;
+  codigo_institucional: string;
+  correo: string;
+  nota: string;
+}
 
 interface CatalogoPublicoProps {
   objetos: ObjetoCustodia[];
@@ -21,9 +29,10 @@ interface CatalogoPublicoProps {
   usuarioActual?: {
     nombre?: string;
     correo?: string;
+    codigo_institucional?: string;
     rol?: string;
   } | null;
-  onSolicitarReclamo?: (objetoId: string) => void;
+  onSolicitarReclamo?: (objetoId: string, reclamante?: DatosReclamante) => void;
 }
 
 const SEDES_UNIMINUTO = [
@@ -89,6 +98,16 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
   const [alertaEnviadaCodigo, setAlertaEnviadaCodigo] = useState<string | null>(null);
   const [errorAlerta, setErrorAlerta] = useState('');
 
+  // Estados para Modal de Solicitud de Reclamo
+  const [objetoReclamo, setObjetoReclamo] = useState<ObjetoCustodia | null>(null);
+  const [reclamoConfirmadoRadicado, setReclamoConfirmadoRadicado] = useState<string | null>(null);
+  const [formReclamo, setFormReclamo] = useState<DatosReclamante>({
+    nombre: usuarioActual?.nombre || '',
+    codigo_institucional: usuarioActual?.codigo_institucional || '',
+    correo: usuarioActual?.correo || '',
+    nota: '',
+  });
+
   const [formAlerta, setFormAlerta] = useState({
     titulo: '',
     categoria: 'ELECTRONICA',
@@ -153,6 +172,26 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
     setModalAlertaAbierto(true);
   };
 
+  const abrirModalReclamo = (obj: ObjetoCustodia) => {
+    setFormReclamo({
+      nombre: usuarioActual?.nombre || '',
+      codigo_institucional: usuarioActual?.codigo_institucional || '',
+      correo: usuarioActual?.correo || '',
+      nota: '',
+    });
+    setObjetoReclamo(obj);
+  };
+
+  const confirmarSolicitudReclamo = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!objetoReclamo) return;
+
+    const targetId = objetoReclamo._id || objetoReclamo.radicado_id;
+    onSolicitarReclamo?.(targetId, formReclamo);
+    setReclamoConfirmadoRadicado(objetoReclamo.radicado_id);
+    setObjetoReclamo(null);
+  };
+
   const manejarFotoAlerta = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -203,10 +242,7 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
   };
 
   return (
-    <section
-      id="catalogo-objetos"
-      className="space-y-8"
-    >
+    <section id="catalogo-objetos" className="space-y-8">
       {/* Hero Institucional */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0e1e38] via-[#0b182e] to-[#081326] border border-blue-900/50 p-6 sm:p-10 shadow-2xl">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
@@ -228,7 +264,6 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
             </p>
           </div>
 
-          {/* Botón de Alerta Temprana + Indicador */}
           <div className="shrink-0 flex flex-col gap-3">
             <button
               type="button"
@@ -290,7 +325,6 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
           </div>
         </div>
 
-        {/* Filtro rápido de disponibilidad */}
         <div className="mt-4 flex items-center justify-end">
           <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-300 cursor-pointer select-none">
             <input
@@ -304,7 +338,7 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
         </div>
       </div>
 
-      {/* Banner de confirmación persistente cuando se activa una alerta */}
+      {/* Banner de Alerta Temprana */}
       {alertaEnviadaCodigo && (
         <div className="rounded-2xl bg-yellow-400/10 border border-yellow-400/40 px-5 py-3.5 flex items-center justify-between gap-3 text-xs sm:text-sm text-yellow-200">
           <div className="flex items-center gap-2.5">
@@ -319,6 +353,28 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
             type="button"
             onClick={() => setAlertaEnviadaCodigo(null)}
             className="text-yellow-400 hover:text-yellow-200 cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Banner de Reclamo Iniciado */}
+      {reclamoConfirmadoRadicado && (
+        <div className="rounded-2xl bg-emerald-500/15 border border-emerald-400/40 px-5 py-3.5 flex items-center justify-between gap-3 text-xs sm:text-sm text-emerald-200">
+          <div className="flex items-center gap-2.5">
+            <UserCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>
+              Solicitud de reclamo enviada para el radicado{' '}
+              <strong>{reclamoConfirmadoRadicado}</strong>. Notificamos al equipo de
+              custodia; acércate a portería con tu carné institucional para validar
+              titularidad.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setReclamoConfirmadoRadicado(null)}
+            className="text-emerald-300 hover:text-white cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -456,7 +512,7 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
                   {enCustodia ? (
                     <button
                       type="button"
-                      onClick={() => onSolicitarReclamo?.(obj._id || obj.radicado_id)}
+                      onClick={() => abrirModalReclamo(obj)}
                       className="w-full py-3 px-4 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-extrabold text-xs sm:text-sm transition-colors cursor-pointer"
                     >
                       Es mío • Iniciar Reclamo
@@ -475,7 +531,126 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
         </div>
       )}
 
-      {/* Modal de Alerta Temprana con Foto de Referencia */}
+      {/* Modal de Solicitud de Reclamo */}
+      {objetoReclamo && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="w-full max-w-md rounded-3xl bg-[#0e1e38] border border-yellow-400/50 shadow-2xl overflow-hidden my-8">
+            <div className="px-6 py-4 bg-[#081326] border-b border-blue-900/60 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-yellow-400">
+                  VALIDACIÓN DE TITULARIDAD • {objetoReclamo.radicado_id}
+                </span>
+                <h2 className="text-base font-extrabold text-white">
+                  Reclamar: {objetoReclamo.titulo}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setObjetoReclamo(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={confirmarSolicitudReclamo} className="p-6 space-y-4">
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Notificaremos al personal de custodia de{' '}
+                <strong>{objetoReclamo.sede}</strong> para reservar este bien mientras
+                validas tu identidad en portería.
+              </p>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">
+                  Tu nombre completo *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formReclamo.nombre}
+                  onChange={(e) =>
+                    setFormReclamo({ ...formReclamo, nombre: e.target.value })
+                  }
+                  placeholder="Nombre y apellido"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#081326] border border-blue-900/60 focus:border-yellow-400 text-sm text-white outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    ID Institucional / Cédula *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formReclamo.codigo_institucional}
+                    onChange={(e) =>
+                      setFormReclamo({
+                        ...formReclamo,
+                        codigo_institucional: e.target.value,
+                      })
+                    }
+                    placeholder="Ej. 474909"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#081326] border border-blue-900/60 focus:border-yellow-400 text-sm text-white outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Correo Institucional *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={formReclamo.correo}
+                    onChange={(e) =>
+                      setFormReclamo({ ...formReclamo, correo: e.target.value })
+                    }
+                    placeholder="usuario@uniminuto.edu.co"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#081326] border border-blue-900/60 focus:border-yellow-400 text-sm text-white outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">
+                  Seña particular o dato que confirme que es tuyo *
+                </label>
+                <textarea
+                  rows={2}
+                  required
+                  value={formReclamo.nota}
+                  onChange={(e) =>
+                    setFormReclamo({ ...formReclamo, nota: e.target.value })
+                  }
+                  placeholder="Ej: Tiene un sticker en la tapa, fondo de pantalla o últimos dígitos del serial..."
+                  className="w-full px-3.5 py-2 rounded-xl bg-[#081326] border border-blue-900/60 focus:border-yellow-400 text-xs text-white outline-none"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setObjetoReclamo(null)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:bg-blue-950 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-extrabold text-xs sm:text-sm cursor-pointer"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>Confirmar Reclamo</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Alerta Temprana */}
       {modalAlertaAbierto && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <div className="w-full max-w-lg rounded-3xl bg-[#0e1e38] border border-blue-800/60 shadow-2xl overflow-hidden my-8">
@@ -657,7 +832,6 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
                   </div>
                 </div>
 
-                {/* Subida y vista previa de foto de referencia del usuario */}
                 <div className="space-y-2">
                   <label className="block text-xs font-bold text-slate-300">
                     Foto de referencia del objeto (opcional)

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Database,
   Layers,
@@ -10,26 +10,86 @@ import {
   Download,
   CheckCircle2,
   Shield,
+  FileCheck2,
+  BellRing,
+  Mail,
 } from 'lucide-react';
 import type { ObjetoCustodia } from '../types/campus';
+import type { UsuarioSesion } from './AuthModal';
+
+interface ActaAuditoria {
+  _id?: string;
+  numero_acta: string;
+  radicado_id: string;
+  titulo_bien: string;
+  categoria: string;
+  sede: string;
+  nombre_reclamante: string;
+  id_institucional: string;
+  fecha_hora: string;
+}
+
+interface AlertaResumen {
+  codigo_alerta: string;
+  estado: 'ACTIVA' | 'EN_REVISION' | 'RESUELTA';
+}
 
 interface DataLakeBIProps {
   objetos: ObjetoCustodia[];
+  usuarioActual?: UsuarioSesion | null;
 }
 
-export const DataLakeBI: React.FC<DataLakeBIProps> = ({ objetos }) => {
+export const DataLakeBI: React.FC<DataLakeBIProps> = ({ objetos, usuarioActual }) => {
   const [exportado, setExportado] = useState(false);
+  const [enviandoReporte, setEnviandoReporte] = useState(false);
+  const [mensajeReporte, setMensajeReporte] = useState<string | null>(null);
+  const [actas, setActas] = useState<ActaAuditoria[]>([]);
+  const [alertas, setAlertas] = useState<AlertaResumen[]>([]);
+  const [cargandoBi, setCargandoBi] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/actas')
+        .then((r) => (r.ok ? r.json() : { actas: [] }))
+        .catch(() => ({ actas: [] })),
+      fetch('/api/alertas')
+        .then((r) => (r.ok ? r.json() : { alertas: [] }))
+        .catch(() => ({ alertas: [] })),
+    ]).then(([dataActas, dataAlertas]) => {
+      if (Array.isArray(dataActas.actas)) setActas(dataActas.actas);
+      if (Array.isArray(dataAlertas.alertas)) setAlertas(dataAlertas.alertas);
+      setCargandoBi(false);
+    });
+  }, []);
 
   const totalObjetos = objetos.length + 45;
   const restituidos = objetos.filter((o) => o.estado === 'RESTITUIDO').length + 38;
-  const trePorcentaje = Math.round((restituidos / totalObjetos) * 100);
+  const trePorcentaje = Math.min(100, Math.round((restituidos / totalObjetos) * 100));
+  const alertasResueltas = alertas.filter((a) => a.estado === 'RESUELTA').length;
 
-  const zonasCalor = [
-    { bloque: 'Torre B - Laboratorios TI', incidentes: 34, porcentaje: 85, riesgo: 'Alto' },
-    { bloque: 'Cafetería Central Piso 1', incidentes: 26, porcentaje: 65, riesgo: 'Medio-Alto' },
-    { bloque: 'Biblioteca General (Salas)', incidentes: 19, porcentaje: 48, riesgo: 'Medio' },
-    { bloque: 'Bloque A - Aulas Magistrales', incidentes: 14, porcentaje: 35, riesgo: 'Bajo' },
-  ];
+  const distribucionSedes = useMemo(() => {
+    const conteo: Record<string, number> = {
+      'Sede Principal': 34,
+      'Sede Calle 80': 26,
+      'Sede Perdomo': 19,
+      'Centro Regional Soacha': 14,
+    };
+
+    objetos.forEach((o) => {
+      const clave = o.sede || 'Sede Principal';
+      conteo[clave] = (conteo[clave] || 0) + 1;
+    });
+
+    const entries = Object.entries(conteo).sort((a, b) => b[1] - a[1]);
+    const maxVal = Math.max(...entries.map(([, v]) => v), 1);
+
+    return entries.map(([sede, incidentes]) => {
+      const porcentaje = Math.round((incidentes / maxVal) * 100);
+      const riesgo =
+        porcentaje > 75 ? 'Alto' : porcentaje > 55 ? 'Medio-Alto' : porcentaje > 35 ? 'Medio' : 'Bajo';
+      return { sede, incidentes, porcentaje, riesgo };
+    });
+  }, [objetos]);
 
   const franjasHorarias = [
     { franja: '07:00 - 09:00', valor: 28, etiqueta: 'Ingreso Mañana' },
@@ -40,12 +100,12 @@ export const DataLakeBI: React.FC<DataLakeBIProps> = ({ objetos }) => {
 
   const exportarParquetSimulado = () => {
     const csvContent =
-      'radicado_id,categoria,sede,edificio,estado,hash_sha256\n' +
+      'radicado_id,titulo,categoria,sede,edificio,estado,acta_asociada\n' +
       objetos
-        .map(
-          (o) =>
-            `${o.radicado_id},${o.categoria},"${o.sede}","${o.edificio}",${o.estado},${o.hash_sha256}`
-        )
+        .map((o) => {
+          const acta = actas.find((a) => a.radicado_id === o.radicado_id);
+          return `${o.radicado_id},"${o.titulo}",${o.categoria},"${o.sede}","${o.edificio || 'Portería'}",${o.estado},${acta?.numero_acta || 'N/A'}`;
+        })
         .join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -60,38 +120,83 @@ export const DataLakeBI: React.FC<DataLakeBIProps> = ({ objetos }) => {
     setTimeout(() => setExportado(false), 4000);
   };
 
+  const enviarReporteEjecutivoCorreo = async () => {
+    setEnviandoReporte(true);
+    setMensajeReporte(null);
+    try {
+      const res = await fetch('/api/reportes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          correo_destino: usuarioActual?.correo,
+          generado_por: usuarioActual?.nombre || 'Equipo de Custodia',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'No se pudo enviar el reporte.');
+      setMensajeReporte(data.mensaje || 'Reporte ejecutivo enviado por correo.');
+      setTimeout(() => setMensajeReporte(null), 5000);
+    } catch (err) {
+      setMensajeReporte(
+        err instanceof Error ? err.message : 'Error al enviar el reporte ejecutivo.'
+      );
+    } finally {
+      setEnviandoReporte(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-zinc-900 rounded-3xl border border-zinc-800 p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <span className="text-xs font-extrabold uppercase tracking-wider text-yellow-400">
-            MinIO Object Storage S3 + DuckDB OLAP
+            MinIO Object Storage S3 + DuckDB OLAP • Datos en Vivo
           </span>
           <h2 className="text-xl sm:text-2xl font-bold text-white mt-0.5">
             Arquitectura Data Lake (Medallion) &amp; Analítica Institucional
           </h2>
           <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-            Desacoplamiento estricto de archivos binarios (BLOBs) para proteger la memoria RAM de MongoDB.
+            Desacoplamiento estricto de archivos binarios (BLOBs) y trazabilidad auditable de actas de entrega.
           </p>
         </div>
 
-        <button
-          onClick={exportarParquetSimulado}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-zinc-950 text-xs sm:text-sm font-extrabold transition-colors cursor-pointer shrink-0"
-        >
-          {exportado ? (
-            <>
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Dataset Zona Oro Descargado</span>
-            </>
-          ) : (
-            <>
-              <Download className="w-4 h-4" />
-              <span>Exportar Zona Oro (BI Dataset)</span>
-            </>
-          )}
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <button
+            type="button"
+            disabled={enviandoReporte}
+            onClick={enviarReporteEjecutivoCorreo}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-zinc-800 hover:bg-zinc-700 border border-yellow-400/40 text-yellow-300 text-xs sm:text-sm font-bold transition-colors cursor-pointer disabled:opacity-50"
+          >
+            <Mail className="w-4 h-4" />
+            <span>{enviandoReporte ? 'Enviando...' : 'Enviar Reporte por Correo'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={exportarParquetSimulado}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-zinc-950 text-xs sm:text-sm font-extrabold transition-colors cursor-pointer"
+          >
+            {exportado ? (
+              <>
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Dataset Zona Oro Descargado</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4" />
+                <span>Exportar Zona Oro (BI Dataset)</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
+
+      {mensajeReporte && (
+        <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-400/40 text-xs sm:text-sm text-emerald-200 flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{mensajeReporte}</span>
+        </div>
+      )}
 
       {/* Topología Medallion */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -104,8 +209,7 @@ export const DataLakeBI: React.FC<DataLakeBIProps> = ({ objetos }) => {
           </div>
           <h3 className="font-bold text-white text-base">Ingesta Inmutable WORM</h3>
           <p className="text-xs text-zinc-400 leading-relaxed">
-            Recepción directa desde porterías mediante <strong className="text-zinc-200">Presigned URLs</strong> de 5 minutos sin
-            pasar por el API Gateway.
+            Recepción directa desde porterías mediante <strong className="text-zinc-200">Presigned URLs</strong> y captura móvil sin saturar el API Gateway.
           </p>
           <div className="pt-2 border-t border-zinc-800 flex items-center justify-between text-[11px] font-mono text-zinc-500">
             <span>Formato: JPG/PNG Original</span>
@@ -122,11 +226,10 @@ export const DataLakeBI: React.FC<DataLakeBIProps> = ({ objetos }) => {
           </div>
           <h3 className="font-bold text-white text-base">Sanitización &amp; Compresión</h3>
           <p className="text-xs text-zinc-400 leading-relaxed">
-            Workers asíncronos (Celery) eliminan metadatos <strong className="text-zinc-200">EXIF/GPS privados</strong> (Ley 1581) y
-            transcodifican a <strong className="text-zinc-200">WebP</strong> (-72% peso).
+            Compresión automática en cliente y limpieza de metadatos <strong className="text-zinc-200">EXIF/GPS privados</strong> conforme a la Ley 1581.
           </p>
           <div className="pt-2 border-t border-zinc-800 flex items-center justify-between text-[11px] font-mono text-zinc-500">
-            <span>Formato: WebP + Thumb 300px</span>
+            <span>Formato: JPEG/WebP Optimizado</span>
             <span className="text-zinc-200 font-bold">Privacy Clean</span>
           </div>
         </div>
@@ -140,17 +243,16 @@ export const DataLakeBI: React.FC<DataLakeBIProps> = ({ objetos }) => {
           </div>
           <h3 className="font-bold text-white text-base">Analítica Columnar OLAP</h3>
           <p className="text-xs text-zinc-400 leading-relaxed">
-            Agregación nocturna en formato columnar <strong className="text-zinc-200">Apache Parquet</strong> consultado por DuckDB
-            sin afectar la operación transaccional.
+            Consolidación en vivo de inventario, <strong className="text-zinc-200">alertas tempranas</strong> y <strong className="text-zinc-200">actas digitales</strong> para auditoría.
           </p>
           <div className="pt-2 border-t border-zinc-800 flex items-center justify-between text-[11px] font-mono text-zinc-500">
-            <span>Formato: .parquet</span>
+            <span>Formato: CSV / Parquet</span>
             <span className="text-yellow-400 font-bold">BI Ready</span>
           </div>
         </div>
       </div>
 
-      {/* KPIs */}
+      {/* KPIs en Vivo */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-zinc-900 p-5 rounded-3xl border border-zinc-800">
           <div className="flex items-center justify-between text-zinc-400 text-xs font-semibold">
@@ -163,20 +265,28 @@ export const DataLakeBI: React.FC<DataLakeBIProps> = ({ objetos }) => {
 
         <div className="bg-zinc-900 p-5 rounded-3xl border border-zinc-800">
           <div className="flex items-center justify-between text-zinc-400 text-xs font-semibold">
-            <span>Tiempo Medio Devolución</span>
-            <Clock className="w-4 h-4 text-yellow-400" />
+            <span>Actas Digitales Firmadas</span>
+            <FileCheck2 className="w-4 h-4 text-emerald-400" />
           </div>
-          <p className="text-3xl font-extrabold text-white mt-2">4.2 hrs</p>
-          <p className="text-xs text-zinc-500 mt-1">Antes: 3.5 días promedio</p>
+          <p className="text-3xl font-extrabold text-white mt-2">
+            {cargandoBi ? '...' : actas.length}
+          </p>
+          <p className="text-xs text-emerald-400 mt-1 font-semibold">
+            Persistidas en MongoDB Atlas
+          </p>
         </div>
 
         <div className="bg-zinc-900 p-5 rounded-3xl border border-zinc-800">
           <div className="flex items-center justify-between text-zinc-400 text-xs font-semibold">
-            <span>Ahorro Almacenamiento</span>
-            <Database className="w-4 h-4 text-yellow-400" />
+            <span>Alertas Tempranas</span>
+            <BellRing className="w-4 h-4 text-yellow-400" />
           </div>
-          <p className="text-3xl font-extrabold text-white mt-2">72.4%</p>
-          <p className="text-xs text-zinc-500 mt-1">Compresión WebP + Parquet</p>
+          <p className="text-3xl font-extrabold text-white mt-2">
+            {cargandoBi ? '...' : alertas.length}
+          </p>
+          <p className="text-xs text-zinc-400 mt-1">
+            {alertasResueltas} notificadas y resueltas
+          </p>
         </div>
 
         <div className="bg-zinc-900 p-5 rounded-3xl border border-zinc-800">
@@ -195,7 +305,7 @@ export const DataLakeBI: React.FC<DataLakeBIProps> = ({ objetos }) => {
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <MapPin className="w-4 h-4 text-yellow-400" />
-              Mapa de Calor por Bloques (Índice 2dsphere)
+              Mapa de Calor por Sedes (Datos Reales + Histórico)
             </h3>
             <p className="text-xs text-zinc-400">
               Priorización de rondas preventivas de seguridad física
@@ -203,12 +313,12 @@ export const DataLakeBI: React.FC<DataLakeBIProps> = ({ objetos }) => {
           </div>
 
           <div className="space-y-4 pt-2">
-            {zonasCalor.map((z) => (
-              <div key={z.bloque} className="space-y-1.5">
+            {distribucionSedes.map((z) => (
+              <div key={z.sede} className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-zinc-200">{z.bloque}</span>
+                  <span className="font-semibold text-zinc-200">{z.sede}</span>
                   <span className="text-zinc-400">
-                    <strong className="text-yellow-400">{z.incidentes}</strong> hallazgos ({z.riesgo})
+                    <strong className="text-yellow-400">{z.incidentes}</strong> registros ({z.riesgo})
                   </span>
                 </div>
                 <div className="w-full h-2.5 bg-zinc-950 rounded-full overflow-hidden border border-zinc-800">
@@ -258,6 +368,57 @@ export const DataLakeBI: React.FC<DataLakeBIProps> = ({ objetos }) => {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Bitácora Auditable de Actas Digitales Persistidas */}
+      <div className="bg-zinc-900 rounded-3xl border border-zinc-800 p-6 space-y-4">
+        <div>
+          <h3 className="text-base font-bold text-white flex items-center gap-2">
+            <Database className="w-4 h-4 text-yellow-400" />
+            Bitácora Auditable de Actas de Restitución (MongoDB Atlas)
+          </h3>
+          <p className="text-xs text-zinc-400">
+            Historial inmutable de entregas validadas con identidad institucional
+          </p>
+        </div>
+
+        {actas.length === 0 ? (
+          <p className="text-xs text-zinc-400 py-4 text-center">
+            Aún no se han firmado actas digitales en MongoDB. Cuando restituyas un bien desde Gestión de Custodia, aparecerá aquí automáticamente.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-zinc-300">
+              <thead className="bg-zinc-950 text-zinc-400 uppercase text-[11px]">
+                <tr>
+                  <th className="px-4 py-3 rounded-l-xl">N.º Acta</th>
+                  <th className="px-4 py-3">Radicado</th>
+                  <th className="px-4 py-3">Bien Entregado</th>
+                  <th className="px-4 py-3">Titular / ID</th>
+                  <th className="px-4 py-3">Sede</th>
+                  <th className="px-4 py-3 rounded-r-xl">Fecha</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-800">
+                {actas.map((a) => (
+                  <tr key={a._id || a.numero_acta}>
+                    <td className="px-4 py-3 font-mono font-bold text-emerald-400">
+                      {a.numero_acta}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-yellow-400">{a.radicado_id}</td>
+                    <td className="px-4 py-3 font-semibold text-white">{a.titulo_bien}</td>
+                    <td className="px-4 py-3">
+                      {a.nombre_reclamante}{' '}
+                      <span className="text-zinc-500">({a.id_institucional})</span>
+                    </td>
+                    <td className="px-4 py-3">{a.sede}</td>
+                    <td className="px-4 py-3 text-zinc-400">{a.fecha_hora}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
