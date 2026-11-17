@@ -34,34 +34,30 @@ async function llamarGemini(modelo: string, payload: object) {
   );
 }
 
-async function obtenerModeloDisponible(): Promise<string | null> {
+async function obtenerModelosActivos(): Promise<string[]> {
   try {
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(geminiApiKey)}`,
       { headers: { 'x-goog-api-key': geminiApiKey } }
     );
-    if (!res.ok) return null;
+    if (!res.ok) return [];
     const data = await res.json();
     const modelos: { name?: string; supportedGenerationMethods?: string[] }[] =
       Array.isArray(data?.models) ? data.models : [];
 
-    // Priorizar modelos 3.x (evitando 2.5 y 2.0 retirados para cuentas nuevas)
-    const activos = modelos.filter(
-      (m) =>
-        m.supportedGenerationMethods?.includes('generateContent') &&
-        !m.name?.includes('2.5') &&
-        !m.name?.includes('2.0') &&
-        !m.name?.includes('1.5')
-    );
-
-    const preferido =
-      activos.find((m) => m.name?.includes('3.8-flash')) ||
-      activos.find((m) => m.name?.includes('flash')) ||
-      activos[0];
-
-    return preferido?.name || null;
+    return modelos
+      .filter(
+        (m) =>
+          m.name &&
+          m.supportedGenerationMethods?.includes('generateContent') &&
+          !m.name.includes('2.5') &&
+          !m.name.includes('2.0') &&
+          !m.name.includes('1.5') &&
+          !m.name.includes('embedding')
+      )
+      .map((m) => m.name as string);
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -79,30 +75,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'El mensaje es obligatorio.' });
   }
 
-  if (!geminiApiKey) {
-    return res.status(500).json({
-      respuesta:
-        'Aún no se ha configurado GEMINI_API_KEY en el servidor. Agrégala en Vercel y redespliega.',
-    });
-  }
-
   try {
-    let resumenInventario = 'No hay registros cargados en este momento.';
+    let objetosCustodia: Record<string, unknown>[] = [];
+    let resumenInventario = 'Actualmente no hay objetos pendientes de reclamo en custodia.';
 
     if (mongoUri) {
       const client = await connectToDatabase();
       const db = client.db('findcampus_db');
-      const objetos = await db
+      objetosCustodia = await db
         .collection('objetos_custodia')
         .find({ estado: { $in: ['EN_CUSTODIA', 'EN_VALIDACION'] } })
         .sort({ created_at: -1 })
         .limit(40)
         .toArray();
 
-      if (objetos.length > 0) {
-        resumenInventario = objetos
+      if (objetosCustodia.length > 0) {
+        resumenInventario = objetosCustodia
           .map((obj) => {
-            const meta = obj.atributos || obj.metadatos || {};
+            const meta = (obj.atributos || obj.metadatos || {}) as Record<string, unknown>;
             const detalleMarca = [meta.marca, meta.modelo, meta.color]
               .filter(Boolean)
               .join(' ');
@@ -112,12 +102,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return `- Radicado: ${obj.radicado_id} | Título: ${obj.titulo} | Categoría: ${obj.categoria} | Sede: ${obj.sede} (${obj.edificio || 'Portería'}) | Estado: ${obj.estado}${detalleMarca ? ` | Características: ${detalleMarca}` : ''}${serialSeguro}`;
           })
           .join('\n');
-      } else {
-        resumenInventario = 'Actualmente no hay objetos pendientes de reclamo en custodia.';
       }
     }
 
-    const systemInstruction = `Eres Unimi, el perrito labrador guía y asistente virtual oficial de FindCampus en UNIMINUTO.
+    if (geminiApiKey) {
+      const systemInstruction = `Eres Unimi, el perrito labrador guía y asistente virtual oficial de FindCampus en UNIMINUTO.
 Tu misión es ayudar a los estudiantes y miembros de la comunidad universitaria a verificar si sus objetos perdidos están en custodia, indicarles en qué sede o portería reclamarlos y guiarlos para reportar una alerta temprana si aún no aparecen.
 
 REGLAS ESTRICTAS:
@@ -131,51 +120,75 @@ REGLAS ESTRICTAS:
 INVENTARIO ACTUAL EN CUSTODIA:
 ${resumenInventario}`;
 
-    const contents = [
-      ...(Array.isArray(historial)
-        ? historial.slice(-6).map((h) => ({
-            role: h.rol,
-            parts: [{ text: h.texto }],
-          }))
-        : []),
-      {
-        role: 'user',
-        parts: [{ text: mensaje.trim() }],
-      },
-    ];
+      const contents = [
+        ...(Array.isArray(historial)
+          ? historial.slice(-6).map((h) => ({
+              role: h.rol,
+              parts: [{ text: h.texto }],
+            }))
+          : []),
+        {
+          role: 'user',
+          parts: [{ text: mensaje.trim() }],
+        },
+      ];
 
-    const payload = {
-      system_instruction: { parts: [{ text: systemInstruction }] },
-      contents,
-      generationConfig: {
-        temperature: 0.4,
-        maxOutputTokens: 450,
-      },
-    };
+      const payload = {
+        system_instruction: { parts: [{ text: systemInstruction }] },
+        contents,
+        generationConfig: {
+          temperature: 0.4,
+          maxOutputTokens: 450,
+        },
+      };
 
-    let geminiRes = await llamarGemini('models/gemini-3.8-flash', payload);
-    if (!geminiRes.ok) {
-      const modeloDetectado = await obtenerModeloDisponible();
-      if (modeloDetectado) {
-        geminiRes = await llamarGemini(modeloDetectado, payload);
+      // Intentar con gemini-3.8-flash y rotar entre todos los modelos activos si hay alta demanda (503/429)
+      const disponibles = await obtenerModelosActivos();
+      const candidatos = Array.from(
+        new Set(['models/gemini-3.8-flash', ...disponibles])
+      );
+
+      for (const modelo of candidatos) {
+        const geminiRes = await llamarGemini(modelo, payload);
+        if (geminiRes.ok) {
+          const data = await geminiRes.json();
+          const respuesta = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (respuesta) {
+            return res.status(200).json({ respuesta });
+          }
+        }
       }
     }
 
-    if (!geminiRes.ok) {
-      const errData = await geminiRes.json().catch(() => ({}));
-      const detalle = errData?.error?.message || `HTTP ${geminiRes.status}`;
-      console.error('Error Gemini API:', detalle);
-      return res.status(502).json({
-        respuesta: `No pude conectar con el servicio de IA (${detalle}).`,
+    // Respaldo inteligente directo si todos los modelos de Gemini tienen saturación temporal
+    const consulta = mensaje.toLowerCase();
+    const coincidencias = objetosCustodia.filter((obj) => {
+      const textoObj = `${obj.titulo} ${obj.categoria} ${obj.sede} ${obj.edificio} ${JSON.stringify(obj.atributos || {})}`.toLowerCase();
+      return consulta
+        .split(/\s+/)
+        .filter((p) => p.length > 3)
+        .some((palabra) => textoObj.includes(palabra));
+    });
+
+    if (coincidencias.length > 0) {
+      const lista = coincidencias
+        .slice(0, 3)
+        .map(
+          (c) =>
+            `• ${c.radicado_id}: ${c.titulo} en ${c.sede} (${c.edificio || 'Portería'})`
+        )
+        .join('\n');
+      return res.status(200).json({
+        respuesta: `¡Guau! Encontré estas coincidencias en nuestro registro institucional de custodia:\n\n${lista}\n\nAcércate a la portería o punto de custodia indicado con tu carné institucional o haz clic en "Es mío • Iniciar Reclamo" en la tarjeta correspondiente.`,
       });
     }
 
-    const data = await geminiRes.json();
-    const respuesta =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      'No pude generar una respuesta en este momento. Intenta reformular tu búsqueda.';
-
-    return res.status(200).json({ respuesta });
+    return res.status(200).json({
+      respuesta:
+        objetosCustodia.length === 0
+          ? '¡Hola! Revisé nuestro registro institucional de custodia y en este momento no hay objetos pendientes de reclamo. Si perdiste algo recientemente, usa el botón amarillo "Reportar Objeto Extraviado" en la parte superior para activar una alerta temprana.'
+          : `¡Hola! Revisé los ${objetosCustodia.length} objeto(s) que tenemos actualmente en custodia y no encontré coincidencias exactas con tu búsqueda. Te recomiendo activar una alerta temprana con el botón amarillo "Reportar Objeto Extraviado" para avisarte apenas ingrese a portería.`,
+    });
   } catch (error) {
     console.error('Error en /api/chat:', error);
     return res.status(500).json({
