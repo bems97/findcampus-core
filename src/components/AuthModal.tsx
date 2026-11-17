@@ -11,6 +11,8 @@ import {
   ArrowLeft,
   CheckCircle2,
   ShieldAlert,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 export interface UsuarioSesion {
@@ -36,6 +38,10 @@ export function AuthModal({ abierto, onCerrar, onAutenticado }: AuthModalProps) 
   const [rol, setRol] = useState<'ESTUDIANTE' | 'ADMIN'>('ESTUDIANTE');
   const [claveAdmin, setClaveAdmin] = useState('');
 
+  // Visibilidad de contraseñas
+  const [verPassword, setVerPassword] = useState(false);
+  const [verClaveAdmin, setVerClaveAdmin] = useState(false);
+
   // Estados para recuperación OTP
   const [otp, setOtp] = useState('');
   const [nuevaPassword, setNuevaPassword] = useState('');
@@ -57,7 +63,6 @@ export function AuthModal({ abierto, onCerrar, onAutenticado }: AuthModalProps) 
     setCargando(true);
 
     try {
-      // Flujo 1: Solicitar código OTP al correo
       if (modo === 'RECOVER_EMAIL') {
         const res = await fetch('/api/auth', {
           method: 'POST',
@@ -77,7 +82,6 @@ export function AuthModal({ abierto, onCerrar, onAutenticado }: AuthModalProps) 
         return;
       }
 
-      // Flujo 2: Validar OTP y guardar nueva contraseña
       if (modo === 'RECOVER_OTP') {
         const res = await fetch('/api/auth', {
           method: 'POST',
@@ -100,12 +104,12 @@ export function AuthModal({ abierto, onCerrar, onAutenticado }: AuthModalProps) 
           setOtp('');
           setNuevaPassword('');
           setPassword('');
+          setVerPassword(false);
           setModo('LOGIN');
         }
         return;
       }
 
-      // Flujo 3: Login o Registro normal
       const payload =
         modo === 'LOGIN'
           ? { accion: 'LOGIN', correo, password }
@@ -134,6 +138,8 @@ export function AuthModal({ abierto, onCerrar, onAutenticado }: AuthModalProps) 
         onCerrar();
         setPassword('');
         setClaveAdmin('');
+        setVerPassword(false);
+        setVerClaveAdmin(false);
       }
     } catch {
       setError('No fue posible conectar con el servidor. Intenta de nuevo.');
@@ -166,7 +172,7 @@ export function AuthModal({ abierto, onCerrar, onAutenticado }: AuthModalProps) 
           </button>
         </div>
 
-        {/* Selector Login / Registro (oculto en modo recuperación) */}
+        {/* Selector Login / Registro */}
         {!esRecuperacion && (
           <div className="grid grid-cols-2 border-b border-zinc-800 bg-zinc-900/40 shrink-0">
             <button
@@ -202,7 +208,7 @@ export function AuthModal({ abierto, onCerrar, onAutenticado }: AuthModalProps) 
           </div>
         )}
 
-        {/* Formulario con scroll interno en pantallas pequeñas */}
+        {/* Formulario */}
         <form
           onSubmit={manejarSubmit}
           className="p-4 sm:p-6 space-y-3.5 sm:space-y-4 overflow-y-auto"
@@ -291,14 +297,22 @@ export function AuthModal({ abierto, onCerrar, onAutenticado }: AuthModalProps) 
                 <div className="relative">
                   <KeyRound className="w-4 h-4 text-zinc-500 absolute left-3 top-2.5" />
                   <input
-                    type="password"
+                    type={verPassword ? 'text' : 'password'}
                     required
                     minLength={6}
                     placeholder="Mínimo 6 caracteres"
                     value={nuevaPassword}
                     onChange={(e) => setNuevaPassword(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-10 py-2 text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setVerPassword((v) => !v)}
+                    className="absolute right-2.5 top-2 text-zinc-400 hover:text-amber-400 p-0.5 cursor-pointer"
+                    title={verPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                  >
+                    {verPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
@@ -389,14 +403,28 @@ export function AuthModal({ abierto, onCerrar, onAutenticado }: AuthModalProps) 
                       <label className="block text-xs text-amber-400 mb-1">
                         Código de Autorización de Seguridad
                       </label>
-                      <input
-                        type="password"
-                        required
-                        placeholder="Ingresa el código institucional"
-                        value={claveAdmin}
-                        onChange={(e) => setClaveAdmin(e.target.value)}
-                        className="w-full bg-zinc-900 border border-amber-500/40 rounded-xl px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
-                      />
+                      <div className="relative">
+                        <input
+                          type={verClaveAdmin ? 'text' : 'password'}
+                          required
+                          placeholder="Ingresa el código institucional"
+                          value={claveAdmin}
+                          onChange={(e) => setClaveAdmin(e.target.value)}
+                          className="w-full bg-zinc-900 border border-amber-500/40 rounded-xl pl-3 pr-10 py-2 text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setVerClaveAdmin((v) => !v)}
+                          className="absolute right-2.5 top-2 text-zinc-400 hover:text-amber-400 p-0.5 cursor-pointer"
+                          title={verClaveAdmin ? 'Ocultar código' : 'Ver código'}
+                        >
+                          {verClaveAdmin ? (
+                            <EyeOff className="w-4 h-4" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </>
@@ -436,14 +464,22 @@ export function AuthModal({ abierto, onCerrar, onAutenticado }: AuthModalProps) 
                 <div className="relative">
                   <KeyRound className="w-4 h-4 text-zinc-500 absolute left-3 top-2.5" />
                   <input
-                    type="password"
+                    type={verPassword ? 'text' : 'password'}
                     required
                     minLength={6}
                     placeholder="Mínimo 6 caracteres"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-10 py-2 text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setVerPassword((v) => !v)}
+                    className="absolute right-2.5 top-2 text-zinc-400 hover:text-amber-400 p-0.5 cursor-pointer"
+                    title={verPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                  >
+                    {verPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
