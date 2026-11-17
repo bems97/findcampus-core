@@ -1,0 +1,57 @@
+import type { ObjetoCustodia } from '../types/campus';
+
+export const INVENTARIO_INICIAL: ObjetoCustodia[] = [
+  {
+    _id: '6730cd89a1f2e30012a4b101',
+    radicado_id: 'FIND-2026-0481',
+    categoria: 'ELECTRONICA',
+    titulo: 'Computador Portátil Lenovo IdeaPad',
+    sede: 'Sede Principal',
+    edificio: 'Torre B - Lab 302',
+    fecha_hallazgo: '2026-11-16 14:20',
+    estado: 'EN_CUSTODIA',
+    evidencia_lake_url: 'https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?auto=format&fit=crop&w=600&q=80',
+    hash_sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    atributos: {
+      marca: 'Lenovo',
+      modelo: 'IdeaPad 5',
+      numero_serie: 'LNV-82R0-4491X',
+      incluye_cargador: true,
+    },
+  },
+  {
+    _id: '6730cd89a1f2e30012a4b102',
+    radicado_id: 'FIND-2026-0482',
+    categoria: 'BILLETERA',
+    titulo: 'Billetera de Cuero Clásica',
+    sede: 'Sede Principal',
+    edificio: 'Cafetería Central',
+    fecha_hallazgo: '2026-11-16 16:05',
+    estado: 'EN_CUSTODIA',
+    evidencia_lake_url: 'https://images.unsplash.com/photo-1627123424574-724758594e93?auto=format&fit=crop&w=600&q=80',
+    hash_sha256: '8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4',
+    atributos: {
+      material: 'Cuero sintético',
+      color: 'Café oscuro',
+      cantidad_documentos: 3,
+      contiene_efectivo: true,
+    },
+  },
+  {
+    _id: '6730cd89a1f2e30012a4b103',
+    radicado_id: 'FIND-2026-0483',
+    categoria: 'DOCUMENTOS',
+    titulo: 'Carné Universitario y Tarjeta Transporte',
+    sede: 'Sede Sur',
+    edificio: 'Biblioteca Piso 2',
+    fecha_hallazgo: '2026-11-15 19:30',
+    estado: 'RESTITUIDO',
+    evidencia_lake_url: 'https://images.unsplash.com/photo-1589829085413-56de8ae18c73?auto=format&fit=crop&w=600&q=80',
+    hash_sha256: '2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae',
+    atributos: {
+      tipo_documento: 'Carné Institucional',
+      titular_enmascarado: 'C.C. 1.029.***.756',
+      descripcion_detalle: 'Portacarné azul con cinta institucional',
+    },
+  },
+];

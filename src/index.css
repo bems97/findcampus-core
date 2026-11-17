@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    background-color: #09090B;
+    background-image: radial-gradient(#27272A 0.85px, transparent 0.85px);
+    background-size: 24px 24px;
+    color: #FAFAFA;
+    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+}
