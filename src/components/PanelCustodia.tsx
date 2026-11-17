@@ -33,7 +33,9 @@ interface AlertaExtravio {
 
 interface PanelCustodiaProps {
   objetos: ObjetoCustodia[];
-  onRecargarObjetos: () => void;
+  onRegistrarObjeto?: (nuevo: ObjetoCustodia) => Promise<void> | void;
+  onRestituirObjeto?: (objetoId: string) => Promise<void> | void;
+  onRecargarObjetos?: () => void;
 }
 
 const SEDES_UNIMINUTO = [
@@ -83,11 +85,12 @@ function comprimirImagen(file: File, maxAncho = 900, calidad = 0.75): Promise<st
 
 export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
   objetos,
+  onRegistrarObjeto,
+  onRestituirObjeto,
   onRecargarObjetos,
 }) => {
   const [tabActiva, setTabActiva] = useState<'registro' | 'alertas' | 'custodia'>('registro');
 
-  // Estado formulario nuevo bien en custodia
   const [guardandoObjeto, setGuardandoObjeto] = useState(false);
   const [mensajeForm, setMensajeForm] = useState<{ tipo: 'ok' | 'err'; texto: string } | null>(
     null
@@ -104,13 +107,10 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
     imagen_url: '',
   });
 
-  // Estado alertas tempranas
   const [alertas, setAlertas] = useState<AlertaExtravio[]>([]);
   const [cargandoAlertas, setCargandoAlertas] = useState(false);
   const [procesandoAlertaId, setProcesandoAlertaId] = useState<string | null>(null);
   const [fotoModal, setFotoModal] = useState<string | null>(null);
-
-  // Filtro rápido en inventario de custodia
   const [filtroInventario, setFiltroInventario] = useState('');
 
   const cargarAlertas = async () => {
@@ -159,7 +159,7 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
         categoria: nuevoObjeto.categoria,
         sede: nuevoObjeto.sede,
         edificio: nuevoObjeto.edificio.trim() || 'Portería Principal',
-        estado: 'EN_CUSTODIA',
+        estado: 'EN_CUSTODIA' as const,
         fecha_hallazgo: new Date().toISOString().slice(0, 16).replace('T', ' '),
         imagen_url: nuevoObjeto.imagen_url || undefined,
         atributos: {
@@ -170,15 +170,19 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
         },
       };
 
-      const res = await fetch('/api/objetos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'No se pudo registrar el objeto en custodia.');
+      if (onRegistrarObjeto) {
+        await onRegistrarObjeto(payload as unknown as ObjetoCustodia);
+      } else {
+        const res = await fetch('/api/objetos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'No se pudo registrar el objeto en custodia.');
+        }
+        onRecargarObjetos?.();
       }
 
       setMensajeForm({
@@ -196,7 +200,6 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
         numero_serie: '',
         imagen_url: '',
       });
-      onRecargarObjetos();
     } catch (err) {
       setMensajeForm({
         tipo: 'err',
@@ -240,22 +243,27 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
     }
   };
 
-  const cambiarEstadoObjeto = async (obj: ObjetoCustodia, nuevoEstado: string) => {
+  const restituirBien = async (obj: ObjetoCustodia) => {
+    const targetId = obj._id || obj.radicado_id;
     try {
+      if (onRestituirObjeto) {
+        await onRestituirObjeto(targetId);
+        return;
+      }
       const res = await fetch('/api/objetos', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: obj._id || obj.radicado_id,
+          id: targetId,
           radicado_id: obj.radicado_id,
-          estado: nuevoEstado,
+          estado: 'RESTITUIDO',
         }),
       });
       if (res.ok) {
-        onRecargarObjetos();
+        onRecargarObjetos?.();
       }
     } catch (err) {
-      console.error('Error actualizando estado del objeto:', err);
+      console.error('Error restituyendo bien:', err);
     }
   };
 
@@ -717,10 +725,10 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
                     <td className="px-4 py-3">{obj.sede}</td>
                     <td className="px-4 py-3">{obj.estado}</td>
                     <td className="px-4 py-3 text-right">
-                      {obj.estado !== 'ENTREGADO' ? (
+                      {obj.estado !== 'RESTITUIDO' ? (
                         <button
                           type="button"
-                          onClick={() => cambiarEstadoObjeto(obj, 'ENTREGADO')}
+                          onClick={() => restituirBien(obj)}
                           className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold cursor-pointer"
                         >
                           Restituir con Acta
