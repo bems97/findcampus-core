@@ -26,7 +26,6 @@ export function App() {
 
   const rol = usuario?.rol ?? 'ESTUDIANTE';
 
-  // Cargar datos reales desde MongoDB Atlas al iniciar
   useEffect(() => {
     fetch('/api/objetos')
       .then((res) => (res.ok ? res.json() : null))
@@ -64,7 +63,7 @@ export function App() {
         );
       }
     } catch (error) {
-      console.error('Error guardando en MongoDB:', error);
+      console.error('Error guardando registro:', error);
     }
   };
 
@@ -79,7 +78,7 @@ export function App() {
         body: JSON.stringify({ id: objetoId, estado: nuevoEstado }),
       });
     } catch (error) {
-      console.error('Error actualizando estado en MongoDB:', error);
+      console.error('Error actualizando estado:', error);
     }
   };
 
@@ -115,12 +114,17 @@ export function App() {
             onRestituirObjeto={restituirObjeto}
           />
         )}
+        {rol === 'ADMIN' && vistaActiva === 'USUARIOS' && (
+          <div className="rounded-2xl bg-zinc-900 border border-zinc-800 p-6 text-center text-zinc-300">
+            Cargando módulo de Gestión de Usuarios...
+          </div>
+        )}
         {rol === 'ADMIN' && vistaActiva === 'DATALAKE' && <DataLakeBI objetos={objetos} />}
         {rol === 'ADMIN' && vistaActiva === 'API' && <ApiInspector objetos={objetos} />}
       </main>
 
-      <footer className="bg-zinc-950/90 border-t border-zinc-800/80 py-5 text-center text-xs text-zinc-500">
-        FindCampus.core • Persistencia Real MongoDB Atlas &amp; Data Lake • Seguridad RBAC &amp; Ley 1581
+      <footer className="bg-zinc-950/95 border-t border-zinc-800/80 py-5 px-4 text-center text-xs text-zinc-400">
+        FindCampus • Sistema Institucional de Objetos Perdidos UNIMINUTO • Protección de Datos Ley 1581
       </footer>
 
       <AsistenteIA objetos={objetos} />

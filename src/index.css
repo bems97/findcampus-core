@@ -1,9 +1,16 @@
 @import "tailwindcss";
 
+@theme {
+  --color-zinc-950: #081326; /* Azul marino mate profundo (fondo base) */
+  --color-zinc-900: #0e1e38; /* Azul institucional mate (tarjetas, navbar y modales) */
+  --color-zinc-800: #193158; /* Azul cobalto mate (bordes, inputs y contenedores internos) */
+  --color-zinc-700: #25467a; /* Azul medio mate (divisores y estados hover) */
+}
+
 @layer base {
   body {
-    background-color: #09090B;
-    background-image: radial-gradient(#27272A 0.85px, transparent 0.85px);
+    background-color: #081326;
+    background-image: radial-gradient(#193158 0.9px, transparent 0.9px);
     background-size: 24px 24px;
     color: #FAFAFA;
     font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
