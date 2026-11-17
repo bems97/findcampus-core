@@ -1,116 +1,232 @@
-import React, { useState } from 'react';
-import { Bot, X, Send, Sparkles } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { X, Send, Sparkles } from 'lucide-react';
 import type { ObjetoCustodia } from '../types/campus';
 
 interface AsistenteIAProps {
   objetos: ObjetoCustodia[];
 }
 
-interface Mensaje {
-  autor: 'BOT' | 'USER';
+interface MensajeChat {
+  id: string;
+  autor: 'unimi' | 'usuario';
   texto: string;
 }
 
-export const AsistenteIA: React.FC<AsistenteIAProps> = ({ objetos }) => {
+const AvatarUnimi: React.FC<{ className?: string }> = ({ className = 'w-9 h-9' }) => (
+  <svg
+    viewBox="0 0 120 120"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+    aria-label="Unimi perro guía"
+  >
+    {/* Fondo circular azul institucional */}
+    <circle cx="60" cy="60" r="56" fill="#0E1E38" stroke="#FACC15" strokeWidth="5" />
+    {/* Orejas caídas de labrador */}
+    <path
+      d="M28 48C20 53 18 70 25 78C30 83 37 78 39 68L41 52L28 48Z"
+      fill="#D97706"
+    />
+    <path
+      d="M92 48C100 53 102 70 95 78C90 83 83 78 81 68L79 52L92 48Z"
+      fill="#D97706"
+    />
+    {/* Pañuelo institucional azul cobalto y placa amarilla */}
+    <path d="M35 86C44 96 76 96 85 86L79 102H41L35 86Z" fill="#1D4ED8" />
+    <circle cx="60" cy="95" r="5.5" fill="#FACC15" />
+    {/* Cabeza del labrador */}
+    <ellipse cx="60" cy="62" rx="28" ry="27" fill="#FBBF24" />
+    {/* Hocico crema */}
+    <ellipse cx="60" cy="71" rx="15" ry="12" fill="#FEF3C7" />
+    {/* Ojos expresivos */}
+    <circle cx="48" cy="56" r="4.2" fill="#081326" />
+    <circle cx="72" cy="56" r="4.2" fill="#081326" />
+    <circle cx="49.3" cy="54.7" r="1.4" fill="#FFFFFF" />
+    <circle cx="73.3" cy="54.7" r="1.4" fill="#FFFFFF" />
+    {/* Cejas simpáticas */}
+    <path d="M43 49C46 47 50 47 52 49" stroke="#B45309" strokeWidth="2.4" strokeLinecap="round" />
+    <path d="M68 49C70 47 74 47 77 49" stroke="#B45309" strokeWidth="2.4" strokeLinecap="round" />
+    {/* Nariz */}
+    <ellipse cx="60" cy="66.5" rx="5.5" ry="4" fill="#081326" />
+    <ellipse cx="58.5" cy="65.3" rx="1.8" ry="1" fill="#64748B" />
+    {/* Sonrisa y lengüita */}
+    <path
+      d="M52 74C55 77.5 65 77.5 68 74"
+      stroke="#081326"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+    />
+    <path d="M57 76.5C57 80.5 63 80.5 63 76.5" fill="#FB7185" />
+  </svg>
+);
+
+export const AsistenteIA: React.FC<AsistenteIAProps> = () => {
   const [abierto, setAbierto] = useState(false);
   const [input, setInput] = useState('');
-  const [mensajes, setMensajes] = useState<Mensaje[]>([
+  const [cargando, setCargando] = useState(false);
+  const [mensajes, setMensajes] = useState<MensajeChat[]>([
     {
-      autor: 'BOT',
+      id: 'bienvenida',
+      autor: 'unimi',
       texto:
-        '¡Hola! Soy el asistente de FindCampus.core. Dime qué objeto perdiste (ej: "portátil Lenovo" o "billetera café") y buscaré coincidencias en nuestra base NoSQL en tiempo real.',
+        '¡Hola! Soy Unimi, tu perrito guía en FindCampus. Cuéntame qué objeto perdiste (por ejemplo: "portátil Lenovo negro" o "carné en Biblioteca") y revisaré si ya está en custodia.',
     },
   ]);
 
-  const responderConsulta = (textoUsuario: string) => {
-    const q = textoUsuario.toLowerCase();
-    const coincidencias = objetos.filter((o) => {
-      const bloque = `${o.titulo} ${o.categoria} ${o.edificio} ${o.sede} ${
-        o.atributos.marca ?? ''
-      } ${o.atributos.color ?? ''}`.toLowerCase();
-      return q
-        .split(' ')
-        .filter((palabra) => palabra.length > 3)
-        .some((palabra) => bloque.includes(palabra));
-    });
+  const finChatRef = useRef<HTMLDivElement | null>(null);
 
-    if (q.includes('reclamar') || q.includes('requisito') || q.includes('ley 1581')) {
-      return 'Para reclamar un bien: 1) Ubica el radicado en el Catálogo Público, 2) Haz clic en "Es mío • Iniciar Reclamo", 3) Ingresa tu correo institucional y un dato privado (serial o seña particular) para validar el código OTP.';
-    }
+  useEffect(() => {
+    finChatRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [mensajes, abierto]);
 
-    if (coincidencias.length > 0) {
-      const lista = coincidencias
-        .map(
-          (c) =>
-            `• [${c.radicado_id}] ${c.titulo} en ${c.sede} (${c.edificio}) — Estado: ${c.estado}`
-        )
-        .join('\n');
-      return `Encontré ${coincidencias.length} coincidencia(s) en el clúster MongoDB:\n${lista}`;
-    }
-
-    return 'No encontré coincidencias exactas aún en custodia activa. Activa una alerta preventiva con el botón amarillo del encabezado.';
-  };
-
-  const enviar = (e: React.FormEvent) => {
+  const enviarMensaje = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
-    const pregunta = input.trim();
-    const respuesta = responderConsulta(pregunta);
-    setMensajes((prev) => [...prev, { autor: 'USER', texto: pregunta }, { autor: 'BOT', texto: respuesta }]);
+    const texto = input.trim();
+    if (!texto || cargando) return;
+
+    const nuevoMsgUsuario: MensajeChat = {
+      id: `u-${Date.now()}`,
+      autor: 'usuario',
+      texto,
+    };
+
+    const historialParaApi = mensajes.slice(1).map((m) => ({
+      rol: m.autor === 'usuario' ? ('user' as const) : ('model' as const),
+      texto: m.texto,
+    }));
+
+    setMensajes((prev) => [...prev, nuevoMsgUsuario]);
     setInput('');
+    setCargando(true);
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mensaje: texto,
+          historial: historialParaApi,
+        }),
+      });
+
+      const data = await res.json();
+      setMensajes((prev) => [
+        ...prev,
+        {
+          id: `ai-${Date.now()}`,
+          autor: 'unimi',
+          texto:
+            data.respuesta ||
+            'No logré consultar el inventario en este momento. Intenta de nuevo por favor.',
+        },
+      ]);
+    } catch {
+      setMensajes((prev) => [
+        ...prev,
+        {
+          id: `err-${Date.now()}`,
+          autor: 'unimi',
+          texto: 'Parece que hubo un problema de conexión. Inténtalo nuevamente en un momento.',
+        },
+      ]);
+    } finally {
+      setCargando(false);
+    }
   };
 
   return (
     <>
-      <button
-        onClick={() => setAbierto(!abierto)}
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 px-4 py-3 rounded-full bg-yellow-400 hover:bg-yellow-300 text-zinc-950 font-extrabold shadow-xl shadow-yellow-400/20 transition-transform hover:scale-105 cursor-pointer"
-      >
-        <Bot className="w-5 h-5" />
-        <span className="text-xs hidden sm:inline">Asistente FindCampus IA</span>
-      </button>
+      {/* Botón flotante con Unimi */}
+      {!abierto && (
+        <button
+          onClick={() => setAbierto(true)}
+          title="Hablar con Unimi"
+          className="fixed bottom-5 right-5 z-40 group flex items-center gap-2.5 pl-2 pr-4 py-2 rounded-full bg-yellow-400 hover:bg-yellow-300 text-zinc-950 font-extrabold text-xs sm:text-sm shadow-2xl shadow-black/60 border-2 border-zinc-900 transition-transform hover:scale-105 cursor-pointer"
+        >
+          <AvatarUnimi className="w-10 h-10 shrink-0" />
+          <div className="text-left leading-tight">
+            <span className="block font-extrabold">Unimi</span>
+            <span className="block text-[10px] font-semibold text-zinc-900/80">
+              Guía de búsqueda
+            </span>
+          </div>
+        </button>
+      )}
 
+      {/* Ventana de chat */}
       {abierto && (
-        <div className="fixed bottom-20 right-6 z-50 w-88 sm:w-96 bg-zinc-900 rounded-2xl border border-zinc-800 shadow-2xl overflow-hidden flex flex-col">
-          <div className="bg-zinc-950 border-b border-zinc-800 text-white p-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-yellow-400" />
-              <div>
-                <p className="text-sm font-bold">FindCampus AI Matcher</p>
-                <p className="text-[11px] text-zinc-400">Conectado a MongoDB Full-Text Index</p>
+        <div className="fixed bottom-4 right-4 left-4 sm:left-auto sm:w-96 z-50 rounded-2xl bg-zinc-900 border border-zinc-700 shadow-2xl shadow-black/80 overflow-hidden flex flex-col max-h-[80vh]">
+          {/* Cabecera */}
+          <div className="px-4 py-3 bg-zinc-950 border-b border-zinc-800 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <AvatarUnimi className="w-10 h-10 shrink-0" />
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <h3 className="font-extrabold text-sm text-zinc-100 truncate">Unimi</h3>
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-yellow-400/15 text-yellow-400 border border-yellow-400/30">
+                    <Sparkles className="w-2.5 h-2.5" /> IA
+                  </span>
+                </div>
+                <p className="text-[11px] text-zinc-400 truncate">
+                  Asistente Virtual UNIMINUTO
+                </p>
               </div>
             </div>
-            <button onClick={() => setAbierto(false)} className="text-zinc-400 hover:text-white cursor-pointer">
+            <button
+              onClick={() => setAbierto(false)}
+              aria-label="Cerrar asistente Unimi"
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors cursor-pointer"
+            >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          <div className="p-4 h-72 overflow-y-auto space-y-3 bg-zinc-900 text-xs">
-            {mensajes.map((m, idx) => (
+          {/* Mensajes */}
+          <div className="p-4 space-y-3 overflow-y-auto flex-1 min-h-[240px] max-h-[52vh]">
+            {mensajes.map((msg) => (
               <div
-                key={idx}
-                className={`p-3 rounded-xl whitespace-pre-line leading-relaxed ${
-                  m.autor === 'USER'
-                    ? 'bg-yellow-400 text-zinc-950 font-semibold ml-8'
-                    : 'bg-zinc-950 text-zinc-200 border border-zinc-800 mr-6'
-                }`}
+                key={msg.id}
+                className={`flex ${msg.autor === 'usuario' ? 'justify-end' : 'justify-start'}`}
               >
-                {m.texto}
+                <div
+                  className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm leading-relaxed whitespace-pre-line ${
+                    msg.autor === 'usuario'
+                      ? 'bg-yellow-400 text-zinc-950 font-semibold rounded-br-sm'
+                      : 'bg-zinc-950 text-zinc-100 border border-zinc-800 rounded-bl-sm'
+                  }`}
+                >
+                  {msg.texto}
+                </div>
               </div>
             ))}
+
+            {cargando && (
+              <div className="flex justify-start">
+                <div className="bg-zinc-950 border border-zinc-800 rounded-2xl rounded-bl-sm px-3.5 py-2.5 text-xs text-zinc-400 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-yellow-400 animate-bounce" />
+                  Unimi está rastreando en custodia...
+                </div>
+              </div>
+            )}
+            <div ref={finChatRef} />
           </div>
 
-          <form onSubmit={enviar} className="p-3 bg-zinc-950 border-t border-zinc-800 flex gap-2">
+          {/* Input */}
+          <form
+            onSubmit={enviarMensaje}
+            className="p-3 bg-zinc-950 border-t border-zinc-800 flex items-center gap-2"
+          >
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ej: Perdí mi portátil Lenovo..."
-              className="flex-1 px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 text-xs focus:outline-none focus:border-yellow-400"
+              placeholder="Ej: Perdí mis audífonos Sony..."
+              className="flex-1 bg-zinc-900 border border-zinc-700 focus:border-yellow-400 rounded-xl px-3 py-2 text-xs sm:text-sm text-zinc-100 placeholder-zinc-500 outline-none"
             />
             <button
               type="submit"
-              className="p-2 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-zinc-950 cursor-pointer"
+              disabled={!input.trim() || cargando}
+              className="p-2.5 rounded-xl bg-yellow-400 hover:bg-yellow-300 disabled:opacity-40 text-zinc-950 transition-colors cursor-pointer shrink-0"
             >
               <Send className="w-4 h-4" />
             </button>
