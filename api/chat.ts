@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { MongoClient } from 'mongodb';
 
 const mongoUri = process.env.MONGODB_URI as string;
-const geminiApiKey = process.env.GEMINI_API_KEY as string;
+const geminiApiKey = (process.env.GEMINI_API_KEY || '').trim();
 
 let cachedClient: MongoClient | null = null;
 
@@ -17,6 +17,20 @@ async function connectToDatabase() {
 function censurarSerial(valor?: string): string {
   if (!valor || valor.length < 4) return 'PROTEGIDO-LEY-1581';
   return `${valor.slice(0, 2)}****${valor.slice(-2)}`;
+}
+
+async function llamarGemini(modelo: string, payload: object) {
+  return fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${encodeURIComponent(geminiApiKey)}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': geminiApiKey,
+      },
+      body: JSON.stringify(payload),
+    }
+  );
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -36,7 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!geminiApiKey) {
     return res.status(500).json({
       respuesta:
-        '¡Guau! Aún falta configurar mi llave de conexión en el servidor. Pídele al administrador que active GEMINI_API_KEY.',
+        'Aún no se ha configurado GEMINI_API_KEY en el servidor. Agrégala en Vercel y redespliega.',
     });
   }
 
@@ -98,28 +112,26 @@ ${resumenInventario}`;
       },
     ];
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemInstruction }] },
-          contents,
-          generationConfig: {
-            temperature: 0.4,
-            maxOutputTokens: 450,
-          },
-        }),
-      }
-    );
+    const payload = {
+      system_instruction: { parts: [{ text: systemInstruction }] },
+      contents,
+      generationConfig: {
+        temperature: 0.4,
+        maxOutputTokens: 450,
+      },
+    };
+
+    let geminiRes = await llamarGemini('gemini-2.5-flash', payload);
+    if (!geminiRes.ok) {
+      geminiRes = await llamarGemini('gemini-2.0-flash', payload);
+    }
 
     if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      console.error('Error Gemini API:', errText);
+      const errData = await geminiRes.json().catch(() => ({}));
+      const detalle = errData?.error?.message || `HTTP ${geminiRes.status}`;
+      console.error('Error Gemini API:', detalle);
       return res.status(502).json({
-        respuesta:
-          'Tuve un pequeño tropiezo consultando el registro en este momento. Intenta preguntarme de nuevo en unos segundos.',
+        respuesta: `No pude conectar con el servicio de IA (${detalle}).`,
       });
     }
 
