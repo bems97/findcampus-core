@@ -121,9 +121,9 @@ ${resumenInventario}`;
       },
     };
 
-    let geminiRes = await llamarGemini('gemini-3.8-flash', payload);
+let geminiRes = await llamarGemini('gemini-3.8-flash', payload);
     if (!geminiRes.ok) {
-      geminiRes = await llamarGemini('gemini-2.5-flash', payload);
+      geminiRes = await llamarGemini('gemini-3.8-flash-lite', payload);
     }
 
     if (!geminiRes.ok) {
