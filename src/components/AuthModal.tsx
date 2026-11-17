@@ -72,8 +72,7 @@ export function AuthModal({ abierto, onCerrar, onAutenticado }: AuthModalProps) 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto">
-      <div className="w-full max-w-md my-auto bg-zinc-950 border border-amber-500/40 rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
-        {/* Cabecera */}
+<div className="w-[calc(100vw-1.5rem)] max-w-md mx-auto my-auto bg-zinc-950 border border-amber-500/40 rounded-2xl shadow-2xl overflow-hidden max-h-[90dvh] flex flex-col">        {/* Cabecera */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 bg-zinc-900/90 border-b border-zinc-800 shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0" />

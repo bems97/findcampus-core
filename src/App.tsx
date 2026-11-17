@@ -94,7 +94,7 @@ export function App() {
   const totalEnCustodia = objetos.filter((o) => o.estado === 'EN_CUSTODIA').length;
 
   return (
-    <div className="min-h-screen flex flex-col text-zinc-100">
+    <div className="min-h-screen w-full max-w-full overflow-x-clip flex flex-col text-zinc-100">
       <Navbar
         vistaActiva={vistaActiva}
         onCambiarVista={setVistaActiva}
