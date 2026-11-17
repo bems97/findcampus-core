@@ -1,11 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { MongoClient, ObjectId } from 'mongodb';
 import crypto from 'crypto';
-import nodemailer from 'nodemailer';
+import { enviarCorreoTransaccional } from './_mailer';
 
 const uri = process.env.MONGODB_URI as string;
-const gmailUser = process.env.GMAIL_USER as string;
-const gmailPass = process.env.GMAIL_APP_PASSWORD as string;
 
 let cachedClient: MongoClient | null = null;
 
@@ -21,17 +19,6 @@ function hashPassword(password: string): string {
   return crypto.createHash('sha256').update(password).digest('hex');
 }
 
-function crearTransporterGmail() {
-  if (!gmailUser || !gmailPass) return null;
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: gmailUser,
-      pass: gmailPass,
-    },
-  });
-}
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!uri) {
     return res.status(500).json({ error: 'Falta configurar MONGODB_URI' });
@@ -42,7 +29,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const db = client.db('findcampus_db');
     const usersCol = db.collection('usuarios');
 
-    // GET: Listar usuarios registrados (sin hashes sensibles)
     if (req.method === 'GET') {
       const docs = await usersCol
         .find({}, { projection: { password_hash: 0, otp_hash: 0, otp_expira: 0 } })
@@ -61,22 +47,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ usuarios });
     }
 
-    // PATCH: Cambiar rol de un usuario (ESTUDIANTE <-> ADMIN)
     if (req.method === 'PATCH') {
       const { id, rol } = req.body;
       if (!id || (rol !== 'ADMIN' && rol !== 'ESTUDIANTE')) {
         return res.status(400).json({ error: 'Datos inválidos para actualizar el rol.' });
       }
 
-      await usersCol.updateOne(
-        { _id: new ObjectId(String(id)) },
-        { $set: { rol } }
-      );
-
+      await usersCol.updateOne({ _id: new ObjectId(String(id)) }, { $set: { rol } });
       return res.status(200).json({ ok: true, id, rol });
     }
 
-    // DELETE: Eliminar usuario de la base de datos
     if (req.method === 'DELETE') {
       const { id } = req.body;
       if (!id) {
@@ -103,7 +83,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       nueva_password,
     } = req.body;
 
-    // 1. REGISTRO DE NUEVO USUARIO (ESTUDIANTE O ADMIN)
     if (accion === 'REGISTER') {
       if (!nombre || !correo || !password) {
         return res.status(400).json({ error: 'Todos los campos son obligatorios.' });
@@ -140,7 +119,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // 2. INICIO DE SESIÓN (LOGIN)
     if (accion === 'LOGIN') {
       if (!correo || !password) {
         return res.status(400).json({ error: 'Ingresa tu correo y contraseña.' });
@@ -162,7 +140,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // 3. SOLICITAR CÓDIGO OTP DE RECUPERACIÓN POR CORREO
     if (accion === 'REQUEST_OTP') {
       if (!correo) {
         return res.status(400).json({ error: 'Ingresa tu correo registrado.' });
@@ -190,21 +167,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       );
 
-      const transporter = crearTransporterGmail();
-      if (!transporter) {
-        return res.status(500).json({
-          error: 'El servicio de correo institucional aún no está configurado en el servidor.',
-        });
-      }
-
-      await transporter.sendMail({
-        from: `"FindCampus UNIMINUTO" <${gmailUser}>`,
+      const enviado = await enviarCorreoTransaccional({
         to: correoNormalizado,
-        subject: `Código de verificación OTP: ${codigoOtp} • FindCampus`,
+        subject: `Código de verificación OTP: ${codigoOtp} - FindCampus`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; background: #081326; color: #f8fafc; padding: 28px; border-radius: 16px; border: 1px solid #1e3a8a;">
-            <span style="display: inline-block; background: #facc15; color: #090d16; font-weight: 800; font-size: 11px; padding: 4px 10px; border-radius: 999px; letter-spacing: 0.5px;">
-              SEGURIDAD DE CUENTA • FINDCAMPUS
+            <span style="display: inline-block; background: #facc15; color: #090d16; font-weight: 800; font-size: 11px; padding: 4px 10px; border-radius: 999px;">
+              SEGURIDAD DE CUENTA - FINDCAMPUS
             </span>
             <h2 style="margin: 16px 0 8px; color: #ffffff; font-size: 20px;">
               Recuperación de Contraseña
@@ -227,13 +196,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         `,
       });
 
+      if (!enviado) {
+        return res.status(500).json({
+          error: 'El servicio de correo institucional aún no está configurado en el servidor.',
+        });
+      }
+
       return res.status(200).json({
         ok: true,
         mensaje: 'Código OTP enviado a tu correo electrónico.',
       });
     }
 
-    // 4. VALIDAR OTP Y GUARDAR NUEVA CONTRASEÑA
     if (accion === 'RESET_PASSWORD') {
       if (!correo || !otp || !nueva_password) {
         return res.status(400).json({
@@ -271,13 +245,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       await usersCol.updateOne(
         { _id: usuario._id },
         {
-          $set: {
-            password_hash: hashPassword(String(nueva_password).trim()),
-          },
-          $unset: {
-            otp_hash: '',
-            otp_expira: '',
-          },
+          $set: { password_hash: hashPassword(String(nueva_password).trim()) },
+          $unset: { otp_hash: '', otp_expira: '' },
         }
       );
 
