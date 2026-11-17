@@ -5,12 +5,11 @@ import {
   Database,
   BarChart3,
   Terminal,
-  Lock,
-  Unlock,
   UserCheck,
   LogOut,
-  X,
+  UserCircle2,
 } from 'lucide-react';
+import { AuthModal, type UsuarioSesion } from './AuthModal';
 
 export type VistaActiva = 'CATALOGO' | 'CUSTODIA' | 'DATALAKE' | 'API';
 export type RolUsuario = 'ESTUDIANTE' | 'ADMIN';
@@ -18,21 +17,23 @@ export type RolUsuario = 'ESTUDIANTE' | 'ADMIN';
 interface NavbarProps {
   vistaActiva: VistaActiva;
   onCambiarVista: (vista: VistaActiva) => void;
-  rol: RolUsuario;
-  onCambiarRol: (nuevoRol: RolUsuario) => void;
+  usuario: UsuarioSesion | null;
+  onIniciarSesion: (usuario: UsuarioSesion) => void;
+  onCerrarSesion: () => void;
   totalEnCustodia: number;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   vistaActiva,
   onCambiarVista,
-  rol,
-  onCambiarRol,
+  usuario,
+  onIniciarSesion,
+  onCerrarSesion,
   totalEnCustodia,
 }) => {
-  const [modalLoginAbierto, setModalLoginAbierto] = useState(false);
-  const [pinAdmin, setPinAdmin] = useState('');
-  const [errorPin, setErrorPin] = useState(false);
+  const [modalAuthAbierto, setModalAuthAbierto] = useState(false);
+
+  const rol: RolUsuario = usuario?.rol ?? 'ESTUDIANTE';
 
   const navItems: {
     id: VistaActiva;
@@ -47,24 +48,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   ];
 
   const itemsVisibles = navItems.filter((item) => !item.soloAdmin || rol === 'ADMIN');
-
-  const manejarLoginAdmin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (pinAdmin === '1234' || pinAdmin.trim() !== '') {
-      onCambiarRol('ADMIN');
-      onCambiarVista('CUSTODIA');
-      setModalLoginAbierto(false);
-      setPinAdmin('');
-      setErrorPin(false);
-    } else {
-      setErrorPin(true);
-    }
-  };
-
-  const cerrarSesionAdmin = () => {
-    onCambiarRol('ESTUDIANTE');
-    onCambiarVista('CATALOGO');
-  };
 
   return (
     <>
@@ -116,31 +99,37 @@ export const Navbar: React.FC<NavbarProps> = ({
             })}
           </nav>
 
-          {/* Rol / Estado */}
+          {/* Rol / Sesión MongoDB */}
           <div className="flex items-center gap-2.5">
             <span className="hidden xl:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-semibold text-zinc-300">
               <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
               {totalEnCustodia} activos
             </span>
 
-            {rol === 'ESTUDIANTE' ? (
+            {!usuario ? (
               <button
-                onClick={() => setModalLoginAbierto(true)}
+                onClick={() => setModalAuthAbierto(true)}
                 className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-yellow-400 text-zinc-100 hover:text-zinc-950 border border-zinc-700 hover:border-yellow-400 text-xs font-bold transition-all cursor-pointer"
               >
-                <Lock className="w-3.5 h-3.5 text-yellow-400 group-hover:text-zinc-950" />
-                <span className="hidden sm:inline">Acceso Custodia</span>
-                <span className="sm:hidden">Admin</span>
+                <UserCircle2 className="w-4 h-4 text-yellow-400 group-hover:text-zinc-950" />
+                <span className="hidden sm:inline">Ingresar / Registro</span>
+                <span className="sm:hidden">Cuenta</span>
               </button>
             ) : (
               <div className="flex items-center gap-2">
-                <span className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-yellow-400/15 border border-yellow-400/30 text-xs font-bold text-yellow-400">
-                  <UserCheck className="w-3.5 h-3.5" />
-                  Admin MFA
+                <span
+                  className={`hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold ${
+                    usuario.rol === 'ADMIN'
+                      ? 'bg-yellow-400/15 border-yellow-400/30 text-yellow-400'
+                      : 'bg-zinc-950 border-zinc-700 text-zinc-200'
+                  }`}
+                >
+                  <UserCheck className="w-3.5 h-3.5 text-yellow-400" />
+                  {usuario.nombre.split(' ')[0]} ({usuario.rol})
                 </span>
                 <button
-                  onClick={cerrarSesionAdmin}
-                  title="Volver a vista Estudiante"
+                  onClick={onCerrarSesion}
+                  title="Cerrar sesión"
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 text-xs font-bold transition-colors cursor-pointer"
                 >
                   <LogOut className="w-3.5 h-3.5" />
@@ -152,56 +141,16 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </header>
 
-      {/* Modal Login Admin */}
-      {modalLoginAbierto && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-zinc-900 rounded-3xl border border-zinc-800 max-w-sm w-full p-6 shadow-2xl space-y-5">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-yellow-400/15 border border-yellow-400/30 text-yellow-400 flex items-center justify-center">
-                  <Unlock className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-zinc-100">Control de Acceso RBAC</h3>
-                  <p className="text-xs text-zinc-400">Módulo exclusivo Vigilancia &amp; TI</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setModalLoginAbierto(false)}
-                className="p-1 text-zinc-500 hover:text-zinc-200 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={manejarLoginAdmin} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-                  Token MFA / PIN Institucional (Demo: <code className="text-yellow-400">1234</code>)
-                </label>
-                <input
-                  type="password"
-                  autoFocus
-                  value={pinAdmin}
-                  onChange={(e) => setPinAdmin(e.target.value)}
-                  placeholder="Ingresa 1234"
-                  className="w-full px-4 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 text-sm font-mono tracking-widest focus:outline-none focus:border-yellow-400"
-                />
-                {errorPin && (
-                  <p className="text-xs text-rose-400 mt-1">Ingresa el PIN institucional (1234).</p>
-                )}
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-2.5 px-4 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-zinc-950 text-sm font-extrabold shadow-lg shadow-yellow-400/15 cursor-pointer"
-              >
-                Desbloquear Consola Administrativa
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      <AuthModal
+        abierto={modalAuthAbierto}
+        onCerrar={() => setModalAuthAbierto(false)}
+        onAutenticado={(nuevoUsuario) => {
+          onIniciarSesion(nuevoUsuario);
+          if (nuevoUsuario.rol === 'ADMIN') {
+            onCambiarVista('CUSTODIA');
+          }
+        }}
+      />
     </>
   );
 };

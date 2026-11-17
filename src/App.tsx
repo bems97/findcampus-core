@@ -1,17 +1,30 @@
 import { useState, useEffect } from 'react';
-import { Navbar, type VistaActiva, type RolUsuario } from './components/Navbar';
+import { Navbar, type VistaActiva } from './components/Navbar';
 import { CatalogoPublico } from './components/CatalogoPublico';
 import { PanelCustodia } from './components/PanelCustodia';
 import { DataLakeBI } from './components/DataLakeBI';
 import { ApiInspector } from './components/ApiInspector';
 import { AsistenteIA } from './components/AsistenteIA';
+import { type UsuarioSesion } from './components/AuthModal';
 import { INVENTARIO_INICIAL } from './data/mockDatabase';
 import type { ObjetoCustodia } from './types/campus';
 
+const STORAGE_USER_KEY = 'findcampus_usuario_sesion';
+
 export function App() {
-  const [rol, setRol] = useState<RolUsuario>('ESTUDIANTE');
+  const [usuario, setUsuario] = useState<UsuarioSesion | null>(() => {
+    try {
+      const guardado = localStorage.getItem(STORAGE_USER_KEY);
+      return guardado ? (JSON.parse(guardado) as UsuarioSesion) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [vistaActiva, setVistaActiva] = useState<VistaActiva>('CATALOGO');
   const [objetos, setObjetos] = useState<ObjetoCustodia[]>(INVENTARIO_INICIAL);
+
+  const rol = usuario?.rol ?? 'ESTUDIANTE';
 
   // Cargar datos reales desde MongoDB Atlas al iniciar
   useEffect(() => {
@@ -24,6 +37,17 @@ export function App() {
       })
       .catch(() => {});
   }, []);
+
+  const manejarIniciarSesion = (nuevoUsuario: UsuarioSesion) => {
+    setUsuario(nuevoUsuario);
+    localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(nuevoUsuario));
+  };
+
+  const manejarCerrarSesion = () => {
+    setUsuario(null);
+    localStorage.removeItem(STORAGE_USER_KEY);
+    setVistaActiva('CATALOGO');
+  };
 
   const registrarObjeto = async (nuevo: ObjetoCustodia) => {
     setObjetos((prev) => [nuevo, ...prev]);
@@ -74,8 +98,9 @@ export function App() {
       <Navbar
         vistaActiva={vistaActiva}
         onCambiarVista={setVistaActiva}
-        rol={rol}
-        onCambiarRol={setRol}
+        usuario={usuario}
+        onIniciarSesion={manejarIniciarSesion}
+        onCerrarSesion={manejarCerrarSesion}
         totalEnCustodia={totalEnCustodia}
       />
 

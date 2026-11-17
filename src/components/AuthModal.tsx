@@ -1,0 +1,244 @@
+import { useState } from 'react';
+import { ShieldCheck, UserPlus, LogIn, X, KeyRound, Mail, User, Hash } from 'lucide-react';
+
+export interface UsuarioSesion {
+  id: string;
+  nombre: string;
+  correo: string;
+  codigo_institucional: string;
+  rol: 'ESTUDIANTE' | 'ADMIN';
+}
+
+interface AuthModalProps {
+  abierto: boolean;
+  onCerrar: () => void;
+  onAutenticado: (usuario: UsuarioSesion) => void;
+}
+
+export function AuthModal({ abierto, onCerrar, onAutenticado }: AuthModalProps) {
+  const [modo, setModo] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
+  const [nombre, setNombre] = useState('');
+  const [correo, setCorreo] = useState('');
+  const [codigo, setCodigo] = useState('');
+  const [password, setPassword] = useState('');
+  const [rol, setRol] = useState<'ESTUDIANTE' | 'ADMIN'>('ESTUDIANTE');
+  const [claveAdmin, setClaveAdmin] = useState('');
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState('');
+
+  if (!abierto) return null;
+
+  const manejarSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setCargando(true);
+
+    try {
+      const payload =
+        modo === 'LOGIN'
+          ? { accion: 'LOGIN', correo, password }
+          : {
+              accion: 'REGISTER',
+              nombre,
+              correo,
+              codigo_institucional: codigo,
+              password,
+              rol,
+              clave_admin: claveAdmin,
+            };
+
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'No se pudo completar la autenticación.');
+      } else {
+        onAutenticado(data);
+        onCerrar();
+        setPassword('');
+        setClaveAdmin('');
+      }
+    } catch {
+      setError('Error de red al conectar con MongoDB Atlas.');
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+      <div className="w-full max-w-md bg-zinc-950 border border-amber-500/40 rounded-2xl shadow-2xl overflow-hidden">
+        {/* Cabecera */}
+        <div className="flex items-center justify-between px-6 py-4 bg-zinc-900/90 border-b border-zinc-800">
+          <div className="flex items-center gap-2.5">
+            <ShieldCheck className="w-5 h-5 text-amber-400" />
+            <h2 className="font-bold text-zinc-100 text-sm tracking-wide">
+              IDENTIDAD Y ACCESO RBAC
+            </h2>
+          </div>
+          <button
+            onClick={onCerrar}
+            className="text-zinc-400 hover:text-zinc-100 p-1 rounded-lg hover:bg-zinc-800"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Selector Login / Registro */}
+        <div className="grid grid-cols-2 border-b border-zinc-800 bg-zinc-900/40">
+          <button
+            type="button"
+            onClick={() => {
+              setModo('LOGIN');
+              setError('');
+            }}
+            className={`py-3 text-xs font-semibold flex items-center justify-center gap-2 transition-colors ${
+              modo === 'LOGIN'
+                ? 'bg-amber-400 text-zinc-950'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <LogIn className="w-4 h-4" />
+            Iniciar Sesión
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setModo('REGISTER');
+              setError('');
+            }}
+            className={`py-3 text-xs font-semibold flex items-center justify-center gap-2 transition-colors ${
+              modo === 'REGISTER'
+                ? 'bg-amber-400 text-zinc-950'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <UserPlus className="w-4 h-4" />
+            Crear Cuenta en BD
+          </button>
+        </div>
+
+        {/* Formulario */}
+        <form onSubmit={manejarSubmit} className="p-6 space-y-4">
+          {error && (
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/40 text-xs text-red-300">
+              {error}
+            </div>
+          )}
+
+          {modo === 'REGISTER' && (
+            <>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Nombre Completo</label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-zinc-500 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Brayan Morales"
+                    value={nombre}
+                    onChange={(e) => setNombre(e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-zinc-400 mb-1">ID Institucional</label>
+                  <div className="relative">
+                    <Hash className="w-4 h-4 text-zinc-500 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej. 000845120"
+                      value={codigo}
+                      onChange={(e) => setCodigo(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-zinc-400 mb-1">Rol en Campus</label>
+                  <select
+                    value={rol}
+                    onChange={(e) => setRol(e.target.value as 'ESTUDIANTE' | 'ADMIN')}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
+                  >
+                    <option value="ESTUDIANTE">Estudiante</option>
+                    <option value="ADMIN">Admin / Custodia</option>
+                  </select>
+                </div>
+              </div>
+
+              {rol === 'ADMIN' && (
+                <div>
+                  <label className="block text-xs text-amber-400 mb-1">
+                    Clave Maestra de Seguridad (Demo: UNIMINUTO-ADMIN)
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Ingresa código de autorización"
+                    value={claveAdmin}
+                    onChange={(e) => setClaveAdmin(e.target.value)}
+                    className="w-full bg-zinc-900 border border-amber-500/40 rounded-xl px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+              )}
+            </>
+          )}
+
+          <div>
+            <label className="block text-xs text-zinc-400 mb-1">Correo Institucional</label>
+            <div className="relative">
+              <Mail className="w-4 h-4 text-zinc-500 absolute left-3 top-2.5" />
+              <input
+                type="email"
+                required
+                placeholder="usuario@uniminuto.edu.co"
+                value={correo}
+                onChange={(e) => setCorreo(e.target.value)}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs text-zinc-400 mb-1">Contraseña</label>
+            <div className="relative">
+              <KeyRound className="w-4 h-4 text-zinc-500 absolute left-3 top-2.5" />
+              <input
+                type="password"
+                required
+                minLength={6}
+                placeholder="Mínimo 6 caracteres"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-amber-400"
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={cargando}
+            className="w-full py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold text-sm transition-colors disabled:opacity-50"
+          >
+            {cargando
+              ? 'Conectando con MongoDB Atlas...'
+              : modo === 'LOGIN'
+              ? 'Autenticar Sesión'
+              : 'Registrar Usuario en MongoDB'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
