@@ -69,7 +69,11 @@ export function App() {
 
   const actualizarEstadoNube = async (objetoId: string, nuevoEstado: ObjetoCustodia['estado']) => {
     setObjetos((prev) =>
-      prev.map((obj) => (obj._id === objetoId ? { ...obj, estado: nuevoEstado } : obj))
+      prev.map((obj) =>
+        obj._id === objetoId || obj.radicado_id === objetoId
+          ? { ...obj, estado: nuevoEstado }
+          : obj
+      )
     );
     try {
       await fetch('/api/objetos', {
@@ -105,7 +109,11 @@ export function App() {
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {vistaActiva === 'CATALOGO' && (
-          <CatalogoPublico objetos={objetos} onSolicitarReclamo={solicitarReclamo} />
+          <CatalogoPublico
+            objetos={objetos}
+            usuarioActual={usuario}
+            onSolicitarReclamo={solicitarReclamo}
+          />
         )}
         {rol === 'ADMIN' && vistaActiva === 'CUSTODIA' && (
           <PanelCustodia

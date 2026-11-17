@@ -23,8 +23,7 @@ interface CatalogoPublicoProps {
     correo?: string;
     rol?: string;
   } | null;
-  onIniciarReclamo?: (objeto: ObjetoCustodia) => void;
-  onReclamar?: (objeto: ObjetoCustodia) => void;
+  onSolicitarReclamo?: (objetoId: string) => void;
 }
 
 const SEDES_UNIMINUTO = [
@@ -78,15 +77,13 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
   objetos,
   cargando = false,
   usuarioActual,
-  onIniciarReclamo,
-  onReclamar,
+  onSolicitarReclamo,
 }) => {
   const [busqueda, setBusqueda] = useState('');
   const [sedeFiltro, setSedeFiltro] = useState('Todas las sedes');
   const [categoriaFiltro, setCategoriaFiltro] = useState('Todas las categorías');
   const [soloDisponibles, setSoloDisponibles] = useState(false);
 
-  // Modal de Alerta Temprana con foto de referencia
   const [modalAlertaAbierto, setModalAlertaAbierto] = useState(false);
   const [enviandoAlerta, setEnviandoAlerta] = useState(false);
   const [alertaEnviadaCodigo, setAlertaEnviadaCodigo] = useState<string | null>(null);
@@ -205,15 +202,10 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
     }
   };
 
-  const manejarAccionReclamo = (objeto: ObjetoCustodia) => {
-    if (onIniciarReclamo) onIniciarReclamo(objeto);
-    else if (onReclamar) onReclamar(objeto);
-  };
-
   return (
     <section
       id="catalogo-objetos"
-      className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8"
+      className="space-y-8"
     >
       {/* Hero Institucional */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0e1e38] via-[#0b182e] to-[#081326] border border-blue-900/50 p-6 sm:p-10 shadow-2xl">
@@ -464,7 +456,7 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
                   {enCustodia ? (
                     <button
                       type="button"
-                      onClick={() => manejarAccionReclamo(obj)}
+                      onClick={() => onSolicitarReclamo?.(obj._id || obj.radicado_id)}
                       className="w-full py-3 px-4 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-extrabold text-xs sm:text-sm transition-colors cursor-pointer"
                     >
                       Es mío • Iniciar Reclamo
