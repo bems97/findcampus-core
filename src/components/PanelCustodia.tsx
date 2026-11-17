@@ -125,18 +125,19 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
   });
 
   const [alertas, setAlertas] = useState<AlertaExtravio[]>([]);
+  const [actasGuardadas, setActasGuardadas] = useState<DatosActaRestitucion[]>([]);
   const [cargandoAlertas, setCargandoAlertas] = useState(false);
   const [procesandoAlertaId, setProcesandoAlertaId] = useState<string | null>(null);
   const [fotoModal, setFotoModal] = useState<string | null>(null);
   const [filtroInventario, setFiltroInventario] = useState('');
 
-  // Estados para Modal de Acta Digital de Restitución
   const [objetoParaActa, setObjetoParaActa] = useState<ObjetoCustodia | null>(null);
   const [formReclamante, setFormReclamante] = useState({
     nombre_reclamante: '',
     id_institucional: '',
     correo_reclamante: '',
-    observaciones_entrega: 'Validación presencial con carné institucional y descripción física conforme.',
+    observaciones_entrega:
+      'Validación presencial con carné institucional y descripción física conforme.',
   });
   const [actaGenerada, setActaGenerada] = useState<DatosActaRestitucion | null>(null);
   const [procesandoRestitucion, setProcesandoRestitucion] = useState(false);
@@ -156,8 +157,21 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
     }
   };
 
+  const cargarActas = async () => {
+    try {
+      const res = await fetch('/api/actas');
+      const data = await res.json();
+      if (Array.isArray(data.actas)) {
+        setActasGuardadas(data.actas);
+      }
+    } catch (err) {
+      console.error('Error cargando actas:', err);
+    }
+  };
+
   useEffect(() => {
     cargarAlertas();
+    cargarActas();
   }, []);
 
   const manejarCapturaFoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -313,7 +327,29 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
       timeStyle: 'short',
     });
 
+    const nuevaActa: DatosActaRestitucion = {
+      numero_acta: numeroActa,
+      radicado_id: objetoParaActa.radicado_id,
+      titulo_bien: objetoParaActa.titulo,
+      categoria: String(objetoParaActa.categoria),
+      sede: objetoParaActa.sede,
+      edificio: objetoParaActa.edificio || 'Portería Principal',
+      nombre_reclamante: formReclamante.nombre_reclamante.trim(),
+      id_institucional: formReclamante.id_institucional.trim(),
+      correo_reclamante: formReclamante.correo_reclamante.trim(),
+      observaciones_entrega: formReclamante.observaciones_entrega.trim(),
+      fecha_hora: fechaHora,
+    };
+
     try {
+      // 1. Persistir acta en MongoDB y enviar correo de constancia
+      await fetch('/api/actas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nuevaActa),
+      });
+
+      // 2. Actualizar estado del objeto a RESTITUIDO
       if (onRestituirObjeto) {
         await onRestituirObjeto(targetId);
       } else {
@@ -329,19 +365,8 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
         onRecargarObjetos?.();
       }
 
-      setActaGenerada({
-        numero_acta: numeroActa,
-        radicado_id: objetoParaActa.radicado_id,
-        titulo_bien: objetoParaActa.titulo,
-        categoria: String(objetoParaActa.categoria),
-        sede: objetoParaActa.sede,
-        edificio: objetoParaActa.edificio || 'Portería Principal',
-        nombre_reclamante: formReclamante.nombre_reclamante.trim(),
-        id_institucional: formReclamante.id_institucional.trim(),
-        correo_reclamante: formReclamante.correo_reclamante.trim(),
-        observaciones_entrega: formReclamante.observaciones_entrega.trim(),
-        fecha_hora: fechaHora,
-      });
+      setActasGuardadas((prev) => [nuevaActa, ...prev]);
+      setActaGenerada(nuevaActa);
       setObjetoParaActa(null);
     } catch (err) {
       console.error('Error generando acta de restitución:', err);
@@ -446,7 +471,6 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
 
   return (
     <section className="space-y-6">
-      {/* Cabecera del Panel de Custodia */}
       <div className="rounded-3xl bg-[#0e1e38] border border-blue-900/50 p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 shadow-xl">
         <div>
           <div className="inline-flex items-center gap-2 text-xs font-extrabold text-yellow-400 uppercase tracking-wider">
@@ -458,7 +482,6 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
           </h2>
         </div>
 
-        {/* Navegación interna */}
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -502,7 +525,10 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
 
           <button
             type="button"
-            onClick={() => setTabActiva('custodia')}
+            onClick={() => {
+              setTabActiva('custodia');
+              cargarActas();
+            }}
             className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-colors cursor-pointer ${
               tabActiva === 'custodia'
                 ? 'bg-yellow-400 text-slate-950'
@@ -515,7 +541,7 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
         </div>
       </div>
 
-      {/* TAB 1: REGISTRAR HALLAZGO CON CÁMARA */}
+      {/* TAB 1: REGISTRAR HALLAZGO */}
       {tabActiva === 'registro' && (
         <form
           onSubmit={registrarBienCustodia}
@@ -718,7 +744,7 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
         </form>
       )}
 
-      {/* TAB 2: BANDEJA UNIFICADA DE ALERTAS TEMPRANAS */}
+      {/* TAB 2: ALERTAS TEMPRANAS */}
       {tabActiva === 'alertas' && (
         <div className="rounded-3xl bg-[#0e1e38] border border-blue-900/50 p-6 space-y-5 shadow-xl">
           <div>
@@ -858,7 +884,7 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
         </div>
       )}
 
-      {/* TAB 3: INVENTARIO Y ACTAS DIGITALES DE RESTITUCIÓN */}
+      {/* TAB 3: INVENTARIO Y ACTAS DIGITALES */}
       {tabActiva === 'custodia' && (
         <div className="rounded-3xl bg-[#0e1e38] border border-blue-900/50 p-6 space-y-5 shadow-xl">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -867,8 +893,8 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
                 Control de Custodia y Actas de Entrega
               </h3>
               <p className="text-xs text-slate-300">
-                Registra los datos del reclamante para generar el comprobante oficial en
-                PDF.
+                Cada acta firmada queda respaldada en MongoDB Atlas y envía constancia al
+                reclamante.
               </p>
             </div>
             <div className="relative w-full sm:w-72">
@@ -895,71 +921,81 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-blue-950">
-                {objetosInventarioFiltrados.map((obj) => (
-                  <tr key={obj._id || obj.radicado_id}>
-                    <td className="px-4 py-3 font-mono font-bold text-yellow-400">
-                      {obj.radicado_id}
-                    </td>
-                    <td className="px-4 py-3 font-semibold text-white">{obj.titulo}</td>
-                    <td className="px-4 py-3">{obj.sede}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                          obj.estado === 'RESTITUIDO'
-                            ? 'bg-slate-800 text-slate-300'
-                            : obj.estado === 'EN_VALIDACION'
-                            ? 'bg-amber-500/20 text-amber-300'
-                            : 'bg-emerald-500/20 text-emerald-300'
-                        }`}
-                      >
-                        {obj.estado}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {obj.estado !== 'RESTITUIDO' ? (
-                        <button
-                          type="button"
-                          onClick={() => abrirModalActa(obj)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold cursor-pointer"
+                {objetosInventarioFiltrados.map((obj) => {
+                  const actaExistente = actasGuardadas.find(
+                    (a) => a.radicado_id === obj.radicado_id
+                  );
+
+                  return (
+                    <tr key={obj._id || obj.radicado_id}>
+                      <td className="px-4 py-3 font-mono font-bold text-yellow-400">
+                        {obj.radicado_id}
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-white">{obj.titulo}</td>
+                      <td className="px-4 py-3">{obj.sede}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                            obj.estado === 'RESTITUIDO'
+                              ? 'bg-slate-800 text-slate-300'
+                              : obj.estado === 'EN_VALIDACION'
+                              ? 'bg-amber-500/20 text-amber-300'
+                              : 'bg-emerald-500/20 text-emerald-300'
+                          }`}
                         >
-                          <FileText className="w-3.5 h-3.5" />
-                          <span>Restituir con Acta</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            imprimirActaPDF({
-                              numero_acta: `ACTA-${obj.radicado_id.replace('FIND-', '')}`,
-                              radicado_id: obj.radicado_id,
-                              titulo_bien: obj.titulo,
-                              categoria: String(obj.categoria),
-                              sede: obj.sede,
-                              edificio: obj.edificio || 'Portería Principal',
-                              nombre_reclamante: 'Titular Validado en Custodia',
-                              id_institucional: 'Verificado en Portería',
-                              correo_reclamante: '',
-                              observaciones_entrega:
-                                'Bien restituido conforme a protocolo institucional UNIMINUTO.',
-                              fecha_hora: new Date().toLocaleString('es-CO'),
-                            })
-                          }
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-950 hover:bg-blue-900 text-yellow-300 font-bold cursor-pointer"
-                        >
-                          <Printer className="w-3.5 h-3.5" />
-                          <span>Imprimir Copia</span>
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                          {obj.estado}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {obj.estado !== 'RESTITUIDO' ? (
+                          <button
+                            type="button"
+                            onClick={() => abrirModalActa(obj)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold cursor-pointer"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>Restituir con Acta</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              imprimirActaPDF(
+                                actaExistente || {
+                                  numero_acta: `ACTA-${obj.radicado_id.replace('FIND-', '')}`,
+                                  radicado_id: obj.radicado_id,
+                                  titulo_bien: obj.titulo,
+                                  categoria: String(obj.categoria),
+                                  sede: obj.sede,
+                                  edificio: obj.edificio || 'Portería Principal',
+                                  nombre_reclamante: 'Titular Validado en Custodia',
+                                  id_institucional: 'Verificado en Portería',
+                                  correo_reclamante: '',
+                                  observaciones_entrega:
+                                    'Bien restituido conforme a protocolo institucional UNIMINUTO.',
+                                  fecha_hora: new Date().toLocaleString('es-CO'),
+                                }
+                              )
+                            }
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-950 hover:bg-blue-900 text-yellow-300 font-bold cursor-pointer"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            <span>
+                              {actaExistente ? `Imprimir ${actaExistente.numero_acta}` : 'Imprimir Copia'}
+                            </span>
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      {/* MODAL 1: FORMULARIO PARA GENERAR ACTA DE RESTITUCIÓN */}
+      {/* MODAL 1: FORMULARIO PARA GENERAR ACTA */}
       {objetoParaActa && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-lg rounded-3xl bg-[#0e1e38] border border-yellow-400/40 shadow-2xl overflow-hidden">
@@ -1023,7 +1059,7 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
 
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1">
-                    Correo del Reclamante
+                    Correo del Reclamante (envía copia)
                   </label>
                   <input
                     type="email"
@@ -1073,8 +1109,8 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
                   <FileText className="w-4 h-4" />
                   <span>
                     {procesandoRestitucion
-                      ? 'Generando acta...'
-                      : 'Firmar y Generar Acta'}
+                      ? 'Guardando acta...'
+                      : 'Firmar y Guardar Acta'}
                   </span>
                 </button>
               </div>
@@ -1083,7 +1119,7 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
         </div>
       )}
 
-      {/* MODAL 2: VISTA PREVIA E IMPRESIÓN PDF DEL ACTA GENERADA */}
+      {/* MODAL 2: VISTA PREVIA E IMPRESIÓN PDF */}
       {actaGenerada && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-lg rounded-3xl bg-[#0e1e38] border border-emerald-400/40 shadow-2xl p-6 space-y-5">
@@ -1092,7 +1128,7 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
                 <CheckCircle2 className="w-7 h-7 text-emerald-400 shrink-0" />
                 <div>
                   <h3 className="text-lg font-extrabold text-white">
-                    Acta Digital Generada
+                    Acta Registrada en MongoDB
                   </h3>
                   <p className="text-xs font-mono text-yellow-400">
                     {actaGenerada.numero_acta} • Radicado {actaGenerada.radicado_id}
@@ -1145,7 +1181,6 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
         </div>
       )}
 
-      {/* Visor de foto de referencia */}
       {fotoModal && (
         <div
           onClick={() => setFotoModal(null)}
