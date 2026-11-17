@@ -19,7 +19,7 @@ function censurarSerial(valor?: string): string {
   return `${valor.slice(0, 2)}****${valor.slice(-2)}`;
 }
 
-async function llamarGemini(modelo: string, payload: object, timeoutMs = 4000) {
+async function llamarGemini(modelo: string, payload: object, timeoutMs = 4500) {
   const nombreModelo = modelo.startsWith('models/') ? modelo : `models/${modelo}`;
   return fetch(
     `https://generativelanguage.googleapis.com/v1beta/${nombreModelo}:generateContent?key=${encodeURIComponent(geminiApiKey)}`,
@@ -64,6 +64,69 @@ async function obtenerFlashActivo(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+function respuestaConversacionalRespaldo(
+  mensaje: string,
+  objetosCustodia: Record<string, unknown>[]
+): string {
+  const q = mensaje.toLowerCase().trim();
+
+  // 1. Saludos y cortesía
+  if (/^(hola|buenas|buenos dias|buenos días|buenas tardes|buenas noches|hey|que tal|qué tal|saludos|holi)\b/.test(q)) {
+    return `¡Guau, hola! Qué alegría saludarte por aquí. Soy Unimi, tu perrito guía en FindCampus UNIMINUTO.\n\nPuedo ayudarte a:\n• Rastrear si tu objeto perdido ya está en custodia.\n• Explicarte cómo reclamar un bien o activar una alerta temprana.\n• Resolver dudas sobre horarios y puntos de atención.\n\n¿Qué se te perdió o en qué te puedo echar una pata hoy?`;
+  }
+
+  if (/\b(gracias|muchas gracias|te agradezco|genial|excelente|perfecto)\b/.test(q)) {
+    return `¡Con mucho gusto! Para eso estoy aquí en el campus. Si necesitas buscar otro objeto o reportar alguna novedad, solo escríbeme.`;
+  }
+
+  if (/\b(quien eres|quién eres|que haces|qué haces|como funcionas|cómo funcionas|ayuda)\b/.test(q)) {
+    return `Soy Unimi, el asistente guía oficial de FindCampus en UNIMINUTO.\n\nMi trabajo es ayudarte a recuperar tus pertenencias:\n1. Busco en tiempo real entre los objetos entregados en porterías y Bienestar Universitario.\n2. Te indico en qué sede reclamarlos y qué necesitas llevar.\n3. Si tu objeto aún no aparece, te guío para activar una alerta temprana y avisarte apenas ingrese.`;
+  }
+
+  // 2. Preguntas frecuentes sobre reclamos, horarios o privacidad
+  if (/\b(reclamar|requisitos|que llevo|qué llevo|como reclamo|cómo reclamo|validar|acta)\b/.test(q)) {
+    return `Para reclamar un objeto en custodia sigue estos pasos:\n1. Ubica la tarjeta del objeto en el catálogo y haz clic en "Es mío • Iniciar Reclamo" (o acércate a la portería/sede indicada).\n2. Presenta tu carné universitario o documento de identidad.\n3. Valida algún dato único del bien (como fondo de pantalla, serial parcial o contenido) para firmar tu acta digital de restitución.`;
+  }
+
+  if (/\b(horario|donde queda|dónde queda|porteria|portería|bienestar|sede)\b/.test(q)) {
+    return `Los puntos de recepción y entrega funcionan en las porterías principales y oficinas de Bienestar Universitario de cada sede UNIMINUTO (Sede Principal, Calle 80, Perdomo, Soacha y Centros Regionales) en horario académico habitual de lunes a sábado.`;
+  }
+
+  if (/\b(reportar|alerta|no aparece|extraviado|perdi|perdí)\b/.test(q)) {
+    return `Si tu objeto aún no aparece en el catálogo, haz clic en el botón amarillo "Reportar Objeto Extraviado" en la parte superior de la página.\n\nSolo indica qué perdiste, en qué sede/lugar fue y tu correo institucional: te notificaremos apenas alguien lo entregue en portería.`;
+  }
+
+  if (/\b(ley 1581|privacidad|serial|imei|datos|seguridad)\b/.test(q)) {
+    return `En FindCampus protegemos tus datos bajo la Ley 1581 (Habeas Data). Por seguridad, ocultamos parcialmente seriales, IMEI y documentos en el catálogo público para que solo el verdadero dueño pueda demostrar titularidad al reclamar.`;
+  }
+
+  // 3. Búsqueda inteligente en el inventario real en custodia
+  const palabrasClave = q
+    .replace(/[¿?¡!.,;:]/g, '')
+    .split(/\s+/)
+    .filter((p) => p.length > 3 && !['hay', 'algun', 'algún', 'custodia', 'busco', 'perdido', 'objeto', 'campus'].includes(p));
+
+  const coincidencias = objetosCustodia.filter((obj) => {
+    const textoObj = `${obj.titulo} ${obj.categoria} ${obj.sede} ${obj.edificio} ${JSON.stringify(obj.atributos || {})}`.toLowerCase();
+    return palabrasClave.some((palabra) => textoObj.includes(palabra));
+  });
+
+  if (coincidencias.length > 0) {
+    const lista = coincidencias
+      .slice(0, 3)
+      .map(
+        (c) =>
+          `• ${c.radicado_id}: ${c.titulo} — ${c.sede} (${c.edificio || 'Portería'})`
+      )
+      .join('\n');
+    return `¡Buenas noticias! Encontré estas coincidencias en custodia:\n\n${lista}\n\nHaz clic en "Es mío • Iniciar Reclamo" en la tarjeta del objeto o acércate al punto indicado con tu carné institucional.`;
+  }
+
+  return objetosCustodia.length === 0
+    ? `Revisé nuestro registro institucional de custodia y por ahora no hay objetos pendientes de reclamo.\n\nSi perdiste algo hace poco, te recomiendo pulsar el botón amarillo "Reportar Objeto Extraviado" arriba para dejar activa tu alerta temprana, o pregúntame cualquier duda sobre cómo funciona el portal.`
+    : `Revisé los ${objetosCustodia.length} objeto(s) que tenemos actualmente en custodia y no encontré coincidencias exactas con "${mensaje.trim()}".\n\nTe sugiero activar una alerta temprana con el botón amarillo "Reportar Objeto Extraviado" para avisarte en cuanto llegue a portería.`;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -112,15 +175,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (geminiApiKey) {
       const systemInstruction = `Eres Unimi, el perrito labrador guía y asistente virtual oficial de FindCampus en UNIMINUTO.
-Tu misión es ayudar a los estudiantes y miembros de la comunidad universitaria a verificar si sus objetos perdidos están en custodia, indicarles en qué sede o portería reclamarlos y guiarlos para reportar una alerta temprana si aún no aparecen.
+Eres cálido, empático, conversacional, cercano y muy servicial.
+
+PUEDES Y DEBES RESPONDER A:
+1. Saludos, charlas cordiales y preguntas sobre quién eres ("Hola", "¿Cómo estás?", "¿Qué puedes hacer?", "Gracias").
+2. Búsquedas de objetos perdidos en el campus, verificando el inventario actual en custodia.
+3. Preguntas generales sobre cómo funciona FindCampus, requisitos para reclamar (carné o documento + validación de titularidad), horarios de porterías/Bienestar Universitario, consejos para cuidar pertenencias en el campus y protección de datos (Ley 1581 - Habeas Data).
+4. Si el usuario pregunta algo general de la vida universitaria o pide un consejo rápido, respóndele con amabilidad y vuelve a ofrecerle ayuda con sus pertenencias en el campus.
 
 REGLAS ESTRICTAS:
-1. Tono amable, cercano, institucional y servicial (puedes usar un toque sutil y simpático acorde a un perro guía universitario, sin exagerar).
-2. NUNCA menciones tecnologías internas como MongoDB, NoSQL, bases de datos, APIs, JSON, BSON o servidores. Habla siempre en lenguaje natural ("nuestro registro institucional de custodia", "porterías y bienestar universitario").
-3. PRIVACIDAD (Ley 1581 - Habeas Data): Jamás reveles números de serie completos ni IMEI. Usa únicamente los datos del inventario proporcionado.
-4. Si encuentras coincidencias con lo que busca el usuario, indica el código de radicado (ej. FIND-2026-XXXX), la descripción y la sede donde debe acercarse con su carné o documento institucional para validar titularidad.
-5. Si no hay coincidencias en el inventario actual, dile que aún no ha ingresado a custodia y sugiérele usar el botón amarillo "Reportar Objeto Extraviado" en la pantalla principal para activar una alerta temprana.
-6. Responde de forma clara, breve y bien estructurada en español.
+- NUNCA menciones tecnologías internas como MongoDB, NoSQL, bases de datos, APIs, JSON o servidores. Habla siempre en lenguaje natural ("nuestro registro institucional de custodia", "porterías y Bienestar Universitario").
+- PRIVACIDAD (Ley 1581): Jamás reveles números de serie completos ni IMEI.
+- Si encuentras coincidencias en el inventario, indica el código de radicado (ej. FIND-2026-XXXX), características y la sede donde reclamarlo.
+- Si no hay coincidencias para un objeto buscado, sugiérele activar una alerta temprana con el botón amarillo "Reportar Objeto Extraviado".
+- Responde en español, de forma natural, clara y amigable (máximo 3 párrafos cortos).
 
 INVENTARIO ACTUAL EN CUSTODIA:
 ${resumenInventario}`;
@@ -142,21 +210,20 @@ ${resumenInventario}`;
         system_instruction: { parts: [{ text: systemInstruction }] },
         contents,
         generationConfig: {
-          temperature: 0.4,
+          temperature: 0.65,
           maxOutputTokens: 450,
         },
       };
 
-      // Máximo 2 intentos rápidos (4s + 3.5s) para nunca agotar el límite de 10s de Vercel
       try {
-        const res1 = await llamarGemini('models/gemini-3.8-flash', payload, 4000);
+        const res1 = await llamarGemini('models/gemini-3.8-flash', payload, 4500);
         if (res1.ok) {
           const data = await res1.json();
           const respuesta = data?.candidates?.[0]?.content?.parts?.[0]?.text;
           if (respuesta) return res.status(200).json({ respuesta });
         }
       } catch {
-        // Timeout o fallo puntual, pasamos al segundo modelo flash
+        // Siguiente intento
       }
 
       const otroFlash = await obtenerFlashActivo();
@@ -169,44 +236,17 @@ ${resumenInventario}`;
             if (respuesta) return res.status(200).json({ respuesta });
           }
         } catch {
-          // Pasamos al respaldo instantáneo sobre MongoDB
+          // Respaldo conversacional
         }
       }
     }
 
-    // Respaldo instantáneo directo sobre el inventario institucional
-    const consulta = mensaje.toLowerCase();
-    const coincidencias = objetosCustodia.filter((obj) => {
-      const textoObj = `${obj.titulo} ${obj.categoria} ${obj.sede} ${obj.edificio} ${JSON.stringify(obj.atributos || {})}`.toLowerCase();
-      return consulta
-        .split(/\s+/)
-        .filter((p) => p.length > 3)
-        .some((palabra) => textoObj.includes(palabra));
-    });
-
-    if (coincidencias.length > 0) {
-      const lista = coincidencias
-        .slice(0, 3)
-        .map(
-          (c) =>
-            `• ${c.radicado_id}: ${c.titulo} en ${c.sede} (${c.edificio || 'Portería'})`
-        )
-        .join('\n');
-      return res.status(200).json({
-        respuesta: `¡Guau! Encontré estas coincidencias en nuestro registro institucional de custodia:\n\n${lista}\n\nAcércate a la portería o punto de custodia indicado con tu carné institucional o haz clic en "Es mío • Iniciar Reclamo" en la tarjeta correspondiente.`,
-      });
-    }
-
-    return res.status(200).json({
-      respuesta:
-        objetosCustodia.length === 0
-          ? '¡Hola! Revisé nuestro registro institucional de custodia y en este momento no hay objetos pendientes de reclamo. Si perdiste algo recientemente, usa el botón amarillo "Reportar Objeto Extraviado" en la parte superior para activar una alerta temprana.'
-          : `¡Hola! Revisé los ${objetosCustodia.length} objeto(s) que tenemos actualmente en custodia y no encontré coincidencias exactas con tu búsqueda. Te recomiendo activar una alerta temprana con el botón amarillo "Reportar Objeto Extraviado" para avisarte apenas ingrese a portería.`,
-    });
+    const respuestaRespaldo = respuestaConversacionalRespaldo(mensaje, objetosCustodia);
+    return res.status(200).json({ respuesta: respuestaRespaldo });
   } catch (error) {
     console.error('Error en /api/chat:', error);
     return res.status(500).json({
-      respuesta: 'Ocurrió un error al consultar los objetos en custodia. Intenta nuevamente.',
+      respuesta: 'Tuve un pequeño tropiezo momentáneo. ¿Me lo repites por favor?',
     });
   }
 }
