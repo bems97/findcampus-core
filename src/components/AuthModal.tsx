@@ -71,40 +71,40 @@ export function AuthModal({ abierto, onCerrar, onAutenticado }: AuthModalProps) 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md bg-zinc-950 border border-amber-500/40 rounded-2xl shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto">
+      <div className="w-full max-w-md my-auto bg-zinc-950 border border-amber-500/40 rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
         {/* Cabecera */}
-        <div className="flex items-center justify-between px-6 py-4 bg-zinc-900/90 border-b border-zinc-800">
-          <div className="flex items-center gap-2.5">
-            <ShieldCheck className="w-5 h-5 text-amber-400" />
-            <h2 className="font-bold text-zinc-100 text-sm tracking-wide">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 bg-zinc-900/90 border-b border-zinc-800 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0" />
+            <h2 className="font-bold text-zinc-100 text-xs sm:text-sm tracking-wide truncate">
               PORTAL DE ACCESO INSTITUCIONAL
             </h2>
           </div>
           <button
             onClick={onCerrar}
-            className="text-zinc-400 hover:text-zinc-100 p-1 rounded-lg hover:bg-zinc-800 cursor-pointer"
+            className="text-zinc-400 hover:text-zinc-100 p-1 rounded-lg hover:bg-zinc-800 cursor-pointer shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Selector Login / Registro */}
-        <div className="grid grid-cols-2 border-b border-zinc-800 bg-zinc-900/40">
+        <div className="grid grid-cols-2 border-b border-zinc-800 bg-zinc-900/40 shrink-0">
           <button
             type="button"
             onClick={() => {
               setModo('LOGIN');
               setError('');
             }}
-            className={`py-3 text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer ${
+            className={`py-2.5 sm:py-3 text-xs font-semibold flex items-center justify-center gap-1.5 sm:gap-2 transition-colors cursor-pointer ${
               modo === 'LOGIN'
                 ? 'bg-amber-400 text-zinc-950'
                 : 'text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            <LogIn className="w-4 h-4" />
-            Iniciar Sesión
+            <LogIn className="w-4 h-4 shrink-0" />
+            <span>Iniciar Sesión</span>
           </button>
           <button
             type="button"
@@ -112,19 +112,19 @@ export function AuthModal({ abierto, onCerrar, onAutenticado }: AuthModalProps) 
               setModo('REGISTER');
               setError('');
             }}
-            className={`py-3 text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer ${
+            className={`py-2.5 sm:py-3 text-xs font-semibold flex items-center justify-center gap-1.5 sm:gap-2 transition-colors cursor-pointer ${
               modo === 'REGISTER'
                 ? 'bg-amber-400 text-zinc-950'
                 : 'text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            <UserPlus className="w-4 h-4" />
-            Registrarse
+            <UserPlus className="w-4 h-4 shrink-0" />
+            <span>Registrarse</span>
           </button>
         </div>
 
-        {/* Formulario */}
-        <form onSubmit={manejarSubmit} className="p-6 space-y-4">
+        {/* Formulario con scroll interno en pantallas pequeñas */}
+        <form onSubmit={manejarSubmit} className="p-4 sm:p-6 space-y-3.5 sm:space-y-4 overflow-y-auto">
           {error && (
             <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/40 text-xs text-red-300">
               {error}
@@ -148,7 +148,7 @@ export function AuthModal({ abierto, onCerrar, onAutenticado }: AuthModalProps) 
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-zinc-400 mb-1">ID Institucional</label>
                   <div className="relative">
