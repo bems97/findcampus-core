@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Navbar, type VistaActiva } from './components/Navbar';
 import { CatalogoPublico } from './components/CatalogoPublico';
 import { PanelCustodia } from './components/PanelCustodia';
+import { GestionUsuarios } from './components/GestionUsuarios';
 import { DataLakeBI } from './components/DataLakeBI';
 import { ApiInspector } from './components/ApiInspector';
 import { AsistenteIA } from './components/AsistenteIA';
@@ -123,9 +124,7 @@ export function App() {
           />
         )}
         {rol === 'ADMIN' && vistaActiva === 'USUARIOS' && (
-          <div className="rounded-2xl bg-zinc-900 border border-zinc-800 p-6 text-center text-zinc-300">
-            Cargando módulo de Gestión de Usuarios...
-          </div>
+          <GestionUsuarios usuarioActual={usuario} />
         )}
         {rol === 'ADMIN' && vistaActiva === 'DATALAKE' && <DataLakeBI objetos={objetos} />}
         {rol === 'ADMIN' && vistaActiva === 'API' && <ApiInspector objetos={objetos} />}

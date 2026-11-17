@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 
@@ -37,14 +37,59 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Falta configurar MONGODB_URI' });
   }
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método no permitido' });
-  }
-
   try {
     const client = await connectToDatabase();
     const db = client.db('findcampus_db');
     const usersCol = db.collection('usuarios');
+
+    // GET: Listar usuarios registrados (sin hashes sensibles)
+    if (req.method === 'GET') {
+      const docs = await usersCol
+        .find({}, { projection: { password_hash: 0, otp_hash: 0, otp_expira: 0 } })
+        .sort({ created_at: -1 })
+        .toArray();
+
+      const usuarios = docs.map((u) => ({
+        id: u._id.toString(),
+        nombre: u.nombre,
+        correo: u.correo,
+        codigo_institucional: u.codigo_institucional || 'N/A',
+        rol: u.rol === 'ADMIN' ? 'ADMIN' : 'ESTUDIANTE',
+        created_at: u.created_at || null,
+      }));
+
+      return res.status(200).json({ usuarios });
+    }
+
+    // PATCH: Cambiar rol de un usuario (ESTUDIANTE <-> ADMIN)
+    if (req.method === 'PATCH') {
+      const { id, rol } = req.body;
+      if (!id || (rol !== 'ADMIN' && rol !== 'ESTUDIANTE')) {
+        return res.status(400).json({ error: 'Datos inválidos para actualizar el rol.' });
+      }
+
+      await usersCol.updateOne(
+        { _id: new ObjectId(String(id)) },
+        { $set: { rol } }
+      );
+
+      return res.status(200).json({ ok: true, id, rol });
+    }
+
+    // DELETE: Eliminar usuario de la base de datos
+    if (req.method === 'DELETE') {
+      const { id } = req.body;
+      if (!id) {
+        return res.status(400).json({ error: 'Falta el ID del usuario a eliminar.' });
+      }
+
+      await usersCol.deleteOne({ _id: new ObjectId(String(id)) });
+      return res.status(200).json({ ok: true, id });
+    }
+
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Método no permitido' });
+    }
 
     const {
       accion,
@@ -133,7 +178,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const codigoOtp = crypto.randomInt(100000, 999999).toString();
-      const expiraEn = new Date(Date.now() + 10 * 60 * 1000); // 10 minutos
+      const expiraEn = new Date(Date.now() + 10 * 60 * 1000);
 
       await usersCol.updateOne(
         { _id: usuario._id },
