@@ -42,17 +42,24 @@ async function obtenerModeloDisponible(): Promise<string | null> {
     );
     if (!res.ok) return null;
     const data = await res.json();
-    const modelos = Array.isArray(data?.models) ? data.models : [];
-    const valido =
-      modelos.find(
-        (m: { name?: string; supportedGenerationMethods?: string[] }) =>
-          m.name?.includes('flash') &&
-          m.supportedGenerationMethods?.includes('generateContent')
-      ) ||
-      modelos.find((m: { supportedGenerationMethods?: string[] }) =>
-        m.supportedGenerationMethods?.includes('generateContent')
-      );
-    return valido?.name || null;
+    const modelos: { name?: string; supportedGenerationMethods?: string[] }[] =
+      Array.isArray(data?.models) ? data.models : [];
+
+    // Priorizar modelos 3.x (evitando 2.5 y 2.0 retirados para cuentas nuevas)
+    const activos = modelos.filter(
+      (m) =>
+        m.supportedGenerationMethods?.includes('generateContent') &&
+        !m.name?.includes('2.5') &&
+        !m.name?.includes('2.0') &&
+        !m.name?.includes('1.5')
+    );
+
+    const preferido =
+      activos.find((m) => m.name?.includes('3.8-flash')) ||
+      activos.find((m) => m.name?.includes('flash')) ||
+      activos[0];
+
+    return preferido?.name || null;
   } catch {
     return null;
   }
@@ -146,7 +153,7 @@ ${resumenInventario}`;
       },
     };
 
-    let geminiRes = await llamarGemini('gemini-3.8-flash', payload);
+    let geminiRes = await llamarGemini('models/gemini-3.8-flash', payload);
     if (!geminiRes.ok) {
       const modeloDetectado = await obtenerModeloDisponible();
       if (modeloDetectado) {
