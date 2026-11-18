@@ -21,10 +21,10 @@ function censurarSerial(valor?: string): string {
 
 async function detectarModelosDisponibles(): Promise<string[]> {
   const ordenPreferido = [
+    'gemini-3.5-flash-lite',
+    'gemini-3.5-flash',
+    'gemini-3-flash-preview',
     'gemini-2.5-flash',
-    'gemini-2.5-flash-lite',
-    'gemini-2.0-flash',
-    'gemini-2.0-flash-lite',
   ];
 
   try {
@@ -45,17 +45,23 @@ async function detectarModelosDisponibles(): Promise<string[]> {
         (m) =>
           m.name &&
           m.supportedGenerationMethods?.includes('generateContent') &&
+          m.name.includes('flash') &&
+          !m.name.includes('2.5-flash-lite') &&
+          !m.name.includes('2.0') &&
+          !m.name.includes('1.5') &&
           !m.name.includes('image') &&
           !m.name.includes('tts') &&
           !m.name.includes('robotics')
       )
       .map((m) => m.name!.replace(/^models\//, ''));
 
-    const disponibles = ordenPreferido.filter((preferido) =>
-      compatibles.includes(preferido)
-    );
+    // Poner primero los preferidos que existan en la lista, seguidos de cualquier otro flash disponible
+    const priorizados = [
+      ...ordenPreferido.filter((p) => compatibles.includes(p)),
+      ...compatibles.filter((c) => !ordenPreferido.includes(c)),
+    ];
 
-    return disponibles.length > 0 ? disponibles : ordenPreferido;
+    return priorizados.length > 0 ? priorizados : ordenPreferido;
   } catch {
     return ordenPreferido;
   }
@@ -78,8 +84,7 @@ async function llamarGemini(modelo: string, payload: object, timeoutMs = 12000) 
 
 function respuestaConversacionalRespaldo(
   mensaje: string,
-  objetosCustodia: Record<string, unknown>[],
-  motivoFallo?: string
+  objetosCustodia: Record<string, unknown>[]
 ): string {
   const q = mensaje.toLowerCase().trim();
 
@@ -87,11 +92,8 @@ function respuestaConversacionalRespaldo(
     return `¡Hola! Soy Unimi, tu asistente virtual en UNIMINUTO.\n\nPuedo ayudarte a rastrear objetos perdidos en FindCampus o resolver dudas académicas y generales.\n\n¿En qué te puedo ayudar hoy?`;
   }
 
-  if (/\b(duda|academica|académica|tarea|estudiar|programacion|programación|codigo|código|explica|ayuda)\b/.test(q)) {
-    const avisoConfig = motivoFallo
-      ? `\n\n*(Nota técnica: el motor Gemini IA devolvió "${motivoFallo}"). Intenta enviar tu consulta nuevamente en unos segundos).*`
-      : '';
-    return `¡Claro que sí! Cuéntame exactamente cuál es tu duda académica, de programación o tema universitario y lo revisamos paso a paso.${avisoConfig}`;
+  if (/\b(inscribir|materias|nrc|genesis|génesis|matricula|matrícula|horario)\b/.test(q)) {
+    return `Para inscribir materias en UNIMINUTO:\n1. Ingresa al portal **Génesis+** con tu correo institucional.\n2. Ve a **Perfil del alumno -> Planificación e inscripción -> Inscribirse a clases**.\n3. Selecciona el periodo académico vigente, busca los **NRC** de tus asignaturas según tu malla curricular y confirma el envío.`;
   }
 
   if (/\b(reclamar|requisitos|que llevo|qué llevo|como reclamo|cómo reclamo|validar|acta)\b/.test(q)) {
@@ -191,22 +193,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    let motivoFalloGemini = '';
-
-    if (!geminiApiKey) {
-      motivoFalloGemini = 'Falta configurar GEMINI_API_KEY';
-    } else {
+    if (geminiApiKey) {
       const systemInstruction = `Eres Unimi, un asistente virtual inteligente, amable, claro y versátil integrado en el portal institucional FindCampus de UNIMINUTO.
 
 CAPACIDADES PRINCIPALES:
-1. Asistente General y Académico: Puedes responder libremente y con profundidad sobre CUALQUIER tema que el usuario pregunte (programación, ingeniería de sistemas, redacción, matemáticas, cultura general, consejos de estudio, vida universitaria, tecnología, etc.). No te limites solo a objetos perdidos; si el usuario conversa de otro tema, respóndele directamente de forma útil, natural y completa.
+1. Asistente General y Académico: Puedes responder libremente y con profundidad sobre CUALQUIER tema que el usuario pregunte (trámites universitarios como Génesis+, NRC, aulas virtuales, programación, ingeniería de sistemas, redacción, matemáticas, cultura general, consejos de estudio, tecnología, etc.). No te limites solo a objetos perdidos; si el usuario conversa de otro tema, respóndele directamente de forma útil, natural y completa.
 2. Experto en FindCampus (Custodia de Objetos): Cuando el usuario pregunte por pertenencias extraviadas, inventario, alertas tempranas o reclamos, consulta el INVENTARIO ACTUAL EN CUSTODIA proporcionado abajo.
 
 REGLAS DE SEGURIDAD Y ESTILO:
 - PRIVACIDAD (Ley 1581 - Habeas Data): Jamás reveles números de serie completos, IMEI ni correos personales de estudiantes. Solo muestra el serial parcial ya censurado.
 - Nunca menciones detalles técnicos internos como "MongoDB", "colecciones BSON" o "prompt".
 - Si encuentras coincidencias en el inventario para algo que el usuario busca, indica el radicado (ej. FIND-2026-XXXX), características y la sede donde reclamarlo.
-- Adapta la extensión de tu respuesta a la pregunta: conciso para saludos o búsquedas rápidas, y detallado si te piden una explicación técnica, código o ayuda académica. Responde siempre en español.
+- Adapta la extensión de tu respuesta a la pregunta: conciso para saludos o búsquedas rápidas, y detallado si te piden una explicación técnica, académica o paso a paso. Responde siempre en español.
 
 INVENTARIO ACTUAL EN CUSTODIA:
 ${resumenInventario}
@@ -238,7 +236,7 @@ ${resumenAlertas}`;
 
       const modelosCandidatos = await detectarModelosDisponibles();
 
-      for (const modelo of modelosCandidatos) {
+      for (const modelo of modelosCandidatos.slice(0, 4)) {
         try {
           const resGemini = await llamarGemini(modelo, payload, 12000);
           if (resGemini.ok) {
@@ -248,24 +246,17 @@ ${resumenAlertas}`;
               return res.status(200).json({ respuesta, modelo });
             }
           } else {
-            const errBody = await resGemini.json().catch(() => ({}));
-            motivoFalloGemini =
-              errBody?.error?.message || `HTTP ${resGemini.status} en ${modelo}`;
-            console.error(`Fallo modelo ${modelo}:`, motivoFalloGemini);
+            const errTxt = await resGemini.text().catch(() => '');
+            console.error(`Fallo modelo ${modelo}:`, resGemini.status, errTxt);
           }
         } catch (err) {
-          motivoFalloGemini = err instanceof Error ? err.message : 'Timeout llamando a Gemini';
-          console.error(`Excepción modelo ${modelo}:`, motivoFalloGemini);
+          console.error(`Excepción modelo ${modelo}:`, err);
         }
       }
     }
 
-    const respuestaRespaldo = respuestaConversacionalRespaldo(
-      mensaje,
-      objetosCustodia,
-      motivoFalloGemini
-    );
-    return res.status(200).json({ respuesta: respuestaRespaldo, motivoFalloGemini });
+    const respuestaRespaldo = respuestaConversacionalRespaldo(mensaje, objetosCustodia);
+    return res.status(200).json({ respuesta: respuestaRespaldo });
   } catch (error) {
     console.error('Error en /api/chat:', error);
     return res.status(500).json({
