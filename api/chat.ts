@@ -19,7 +19,49 @@ function censurarSerial(valor?: string): string {
   return `${valor.slice(0, 2)}****${valor.slice(-2)}`;
 }
 
-async function llamarGemini(modelo: string, payload: object, timeoutMs = 8000) {
+async function detectarModelosDisponibles(): Promise<string[]> {
+  const ordenPreferido = [
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite',
+  ];
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(geminiApiKey)}`,
+      { signal: AbortSignal.timeout(4000) }
+    );
+    if (!res.ok) {
+      return ordenPreferido;
+    }
+
+    const data = await res.json();
+    const lista: { name?: string; supportedGenerationMethods?: string[] }[] =
+      Array.isArray(data?.models) ? data.models : [];
+
+    const compatibles = lista
+      .filter(
+        (m) =>
+          m.name &&
+          m.supportedGenerationMethods?.includes('generateContent') &&
+          !m.name.includes('image') &&
+          !m.name.includes('tts') &&
+          !m.name.includes('robotics')
+      )
+      .map((m) => m.name!.replace(/^models\//, ''));
+
+    const disponibles = ordenPreferido.filter((preferido) =>
+      compatibles.includes(preferido)
+    );
+
+    return disponibles.length > 0 ? disponibles : ordenPreferido;
+  } catch {
+    return ordenPreferido;
+  }
+}
+
+async function llamarGemini(modelo: string, payload: object, timeoutMs = 12000) {
   const nombreModelo = modelo.startsWith('models/') ? modelo : `models/${modelo}`;
   return fetch(
     `https://generativelanguage.googleapis.com/v1beta/${nombreModelo}:generateContent?key=${encodeURIComponent(geminiApiKey)}`,
@@ -27,7 +69,6 @@ async function llamarGemini(modelo: string, payload: object, timeoutMs = 8000) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-goog-api-key': geminiApiKey,
       },
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(timeoutMs),
@@ -37,16 +78,20 @@ async function llamarGemini(modelo: string, payload: object, timeoutMs = 8000) {
 
 function respuestaConversacionalRespaldo(
   mensaje: string,
-  objetosCustodia: Record<string, unknown>[]
+  objetosCustodia: Record<string, unknown>[],
+  motivoFallo?: string
 ): string {
   const q = mensaje.toLowerCase().trim();
 
   if (/^(hola|buenas|buenos dias|buenos días|buenas tardes|buenas noches|hey|que tal|qué tal|saludos|holi)\b/.test(q)) {
-    return `¡Hola! Soy Unimi, tu asistente virtual en UNIMINUTO.\n\nPuedo ayudarte tanto a rastrear objetos perdidos en FindCampus como a resolver dudas académicas, de tecnología, programación o cualquier tema general.\n\n¿En qué te puedo ayudar hoy?`;
+    return `¡Hola! Soy Unimi, tu asistente virtual en UNIMINUTO.\n\nPuedo ayudarte a rastrear objetos perdidos en FindCampus o resolver dudas académicas y generales.\n\n¿En qué te puedo ayudar hoy?`;
   }
 
-  if (/\b(gracias|muchas gracias|te agradezco|genial|excelente|perfecto)\b/.test(q)) {
-    return `¡Con mucho gusto! Aquí estoy para lo que necesites, ya sea buscar algo en custodia o resolver cualquier otra duda.`;
+  if (/\b(duda|academica|académica|tarea|estudiar|programacion|programación|codigo|código|explica|ayuda)\b/.test(q)) {
+    const avisoConfig = motivoFallo
+      ? `\n\n*(Nota técnica: el motor Gemini IA devolvió "${motivoFallo}"). Intenta enviar tu consulta nuevamente en unos segundos).*`
+      : '';
+    return `¡Claro que sí! Cuéntame exactamente cuál es tu duda académica, de programación o tema universitario y lo revisamos paso a paso.${avisoConfig}`;
   }
 
   if (/\b(reclamar|requisitos|que llevo|qué llevo|como reclamo|cómo reclamo|validar|acta)\b/.test(q)) {
@@ -78,7 +123,7 @@ function respuestaConversacionalRespaldo(
     return `Encontré estas coincidencias en el inventario de custodia:\n\n${lista}\n\nPuedes iniciar el reclamo directamente desde su tarjeta en el catálogo.`;
   }
 
-  return `En este momento tengo ${objetosCustodia.length} objeto(s) registrado(s) en custodia y no veo una coincidencia exacta con "${mensaje.trim()}". Si perdiste algo, puedes activar una alerta con el botón "Reportar Objeto Extraviado" en la parte superior.`;
+  return `En este momento tengo ${objetosCustodia.length} objeto(s) registrado(s) en custodia. Si buscas una pertenencia, dime qué objeto es; o si tienes una duda académica o técnica, escríbela directamente.`;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -146,7 +191,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    if (geminiApiKey) {
+    let motivoFalloGemini = '';
+
+    if (!geminiApiKey) {
+      motivoFalloGemini = 'Falta configurar GEMINI_API_KEY';
+    } else {
       const systemInstruction = `Eres Unimi, un asistente virtual inteligente, amable, claro y versátil integrado en el portal institucional FindCampus de UNIMINUTO.
 
 CAPACIDADES PRINCIPALES:
@@ -187,26 +236,36 @@ ${resumenAlertas}`;
         },
       };
 
-      const modelosCandidatos = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+      const modelosCandidatos = await detectarModelosDisponibles();
 
       for (const modelo of modelosCandidatos) {
         try {
-          const resGemini = await llamarGemini(modelo, payload, 9000);
+          const resGemini = await llamarGemini(modelo, payload, 12000);
           if (resGemini.ok) {
             const data = await resGemini.json();
             const respuesta = data?.candidates?.[0]?.content?.parts?.[0]?.text;
             if (respuesta) {
               return res.status(200).json({ respuesta, modelo });
             }
+          } else {
+            const errBody = await resGemini.json().catch(() => ({}));
+            motivoFalloGemini =
+              errBody?.error?.message || `HTTP ${resGemini.status} en ${modelo}`;
+            console.error(`Fallo modelo ${modelo}:`, motivoFalloGemini);
           }
-        } catch {
-          // Intentar siguiente modelo
+        } catch (err) {
+          motivoFalloGemini = err instanceof Error ? err.message : 'Timeout llamando a Gemini';
+          console.error(`Excepción modelo ${modelo}:`, motivoFalloGemini);
         }
       }
     }
 
-    const respuestaRespaldo = respuestaConversacionalRespaldo(mensaje, objetosCustodia);
-    return res.status(200).json({ respuesta: respuestaRespaldo });
+    const respuestaRespaldo = respuestaConversacionalRespaldo(
+      mensaje,
+      objetosCustodia,
+      motivoFalloGemini
+    );
+    return res.status(200).json({ respuesta: respuestaRespaldo, motivoFalloGemini });
   } catch (error) {
     console.error('Error en /api/chat:', error);
     return res.status(500).json({
