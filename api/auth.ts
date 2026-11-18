@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { MongoClient, ObjectId } from 'mongodb';
 import crypto from 'crypto';
-import { enviarCorreoTransaccional } from './_mailer';
+import { enviarCorreoTransaccional } from './_mailer.js';
 
 const uri = process.env.MONGODB_URI as string;
 
