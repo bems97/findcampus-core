@@ -19,6 +19,58 @@ function hashPassword(password: string): string {
   return crypto.createHash('sha256').update(password).digest('hex');
 }
 
+function construirHtmlBienvenida(datos: {
+  nombre: string;
+  correo: string;
+  codigo_institucional: string;
+  rol: 'ADMIN' | 'ESTUDIANTE';
+}) {
+  const esAdmin = datos.rol === 'ADMIN';
+
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 540px; margin: 0 auto; background: #081326; color: #f8fafc; padding: 28px; border-radius: 16px; border: 1px solid #1e3a8a;">
+      <span style="display: inline-block; background: ${esAdmin ? '#10b981' : '#facc15'}; color: #081326; font-weight: 800; font-size: 11px; padding: 4px 12px; border-radius: 999px; letter-spacing: 0.4px;">
+        ${esAdmin ? 'CUENTA ADMINISTRATIVA • RBAC CUSTODIA' : 'BIENVENIDO A FINDCAMPUS • UNIMINUTO'}
+      </span>
+
+      <h2 style="margin: 16px 0 8px; color: #ffffff; font-size: 21px;">
+        ${esAdmin ? 'Alta de Operador de Custodia Confirmada' : '¡Tu cuenta institucional está activa!'}
+      </h2>
+
+      <p style="color: #cbd5e1; font-size: 14px; line-height: 1.55;">
+        Hola <strong>${datos.nombre}</strong>, te damos la bienvenida a <strong>FindCampus.core</strong>, la plataforma institucional de gestión y trazabilidad de objetos perdidos de UNIMINUTO.
+      </p>
+
+      <div style="background: #0e1e38; border: 1px solid #1e3a8a; border-radius: 12px; padding: 16px; margin: 18px 0; font-size: 13px; color: #e2e8f0;">
+        <p style="margin: 5px 0;"><strong>Titular:</strong> ${datos.nombre}</p>
+        <p style="margin: 5px 0;"><strong>Correo registrado:</strong> ${datos.correo}</p>
+        <p style="margin: 5px 0;"><strong>ID Institucional:</strong> ${datos.codigo_institucional}</p>
+        <p style="margin: 5px 0;"><strong>Perfil asignado:</strong> <span style="color: #facc15; font-weight: bold;">${datos.rol}</span></p>
+      </div>
+
+      ${
+        esAdmin
+          ? `<p style="color: #cbd5e1; font-size: 13px; line-height: 1.5;">
+               Como operador autorizado podrás registrar hallazgos con evidencia fotográfica, gestionar alertas tempranas, emitir actas digitales de restitución y consultar la analítica multicampus. Recuerda cumplir los protocolos de confidencialidad de la <strong>Ley 1581 de 2012</strong>.
+             </p>`
+          : `<p style="color: #cbd5e1; font-size: 13px; line-height: 1.5;">
+               Desde ahora puedes consultar el catálogo en tiempo real, iniciar solicitudes de reclamo sobre bienes custodiados, activar alertas tempranas con notificación automática y consultar a nuestro asistente virtual <strong>Unimi IA</strong>.
+             </p>`
+      }
+
+      <div style="margin-top: 20px; text-align: center;">
+        <a href="https://findcampus-core.vercel.app" style="display: inline-block; background: #facc15; color: #081326; font-weight: 800; font-size: 13px; text-decoration: none; padding: 11px 22px; border-radius: 10px;">
+          Ingresar a FindCampus.core
+        </a>
+      </div>
+
+      <p style="color: #64748b; font-size: 11px; margin-top: 20px; text-align: center;">
+        UNIMINUTO • Sistema Institucional de Objetos Perdidos • Protección de Datos Ley 1581
+      </p>
+    </div>
+  `;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!uri) {
     return res.status(500).json({ error: 'Falta configurar MONGODB_URI' });
@@ -53,7 +105,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Datos inválidos para actualizar el rol.' });
       }
 
-      await usersCol.updateOne({ _id: new ObjectId(String(id)) }, { $set: { rol } });
+      const objectId = new ObjectId(String(id));
+      const usuarioActualizado = await usersCol.findOne({ _id: objectId });
+      await usersCol.updateOne({ _id: objectId }, { $set: { rol } });
+
+      if (usuarioActualizado?.correo) {
+        await enviarCorreoTransaccional({
+          to: String(usuarioActualizado.correo),
+          subject: `Actualización de Perfil (${rol}) • FindCampus UNIMINUTO`,
+          html: construirHtmlBienvenida({
+            nombre: String(usuarioActualizado.nombre || 'Usuario'),
+            correo: String(usuarioActualizado.correo),
+            codigo_institucional: String(usuarioActualizado.codigo_institucional || 'N/A'),
+            rol,
+          }),
+        }).catch((err) => console.error('Error enviando correo de cambio de rol:', err));
+      }
+
       return res.status(200).json({ ok: true, id, rol });
     }
 
@@ -109,6 +177,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       };
 
       const result = await usersCol.insertOne(nuevoUsuario);
+
+      // Envío de correo de confirmación y bienvenida según el rol
+      await enviarCorreoTransaccional({
+        to: nuevoUsuario.correo,
+        subject:
+          rolAsignado === 'ADMIN'
+            ? 'Alta de Operador Administrativo • FindCampus UNIMINUTO'
+            : 'Bienvenido a FindCampus • Cuenta Institucional Activa',
+        html: construirHtmlBienvenida({
+          nombre: nuevoUsuario.nombre,
+          correo: nuevoUsuario.correo,
+          codigo_institucional: nuevoUsuario.codigo_institucional,
+          rol: rolAsignado,
+        }),
+      }).catch((err) => console.error('Error enviando correo de bienvenida:', err));
 
       return res.status(201).json({
         id: result.insertedId.toString(),
