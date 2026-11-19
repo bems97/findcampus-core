@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   GraduationCap,
   Search,
@@ -22,6 +22,8 @@ interface NavbarProps {
   onIniciarSesion: (usuario: UsuarioSesion) => void;
   onCerrarSesion: () => void;
   totalEnCustodia: number;
+  modalAuthAbierto: boolean;
+  setModalAuthAbierto: (abierto: boolean) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -31,9 +33,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   onIniciarSesion,
   onCerrarSesion,
   totalEnCustodia,
+  modalAuthAbierto,
+  setModalAuthAbierto,
 }) => {
-  const [modalAuthAbierto, setModalAuthAbierto] = useState(false);
-
   const rol: RolUsuario = usuario?.rol ?? 'ESTUDIANTE';
 
   const navItems: {
@@ -128,10 +130,12 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Botones de Cuenta / Sesión */}
           <div className="flex items-center gap-1.5 sm:gap-2 lg:order-3 shrink-0">
-            <span className="hidden 2xl:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-semibold text-zinc-200 whitespace-nowrap">
-              <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
-              {totalEnCustodia} en custodia
-            </span>
+            {usuario && (
+              <span className="hidden 2xl:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-semibold text-zinc-200 whitespace-nowrap">
+                <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
+                {totalEnCustodia} en custodia
+              </span>
+            )}
 
             {!usuario ? (
               <button
@@ -167,7 +171,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
 
-          {/* Navegación responsiva: rejilla 3 cols en móvil vertical cuando es ADMIN, flex en sm+ */}
+          {/* Navegación responsiva */}
           <nav
             className={`w-full lg:w-auto lg:order-2 bg-zinc-950 p-1 rounded-xl border border-zinc-800/90 ${
               itemsVisibles.length > 1

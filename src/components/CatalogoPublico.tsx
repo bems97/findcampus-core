@@ -37,6 +37,7 @@ interface CatalogoPublicoProps {
     rol?: string;
   } | null;
   onSolicitarReclamo?: (objetoId: string, reclamante?: DatosReclamante) => void;
+  onAbrirLogin?: () => void;
 }
 
 const SEDES_UNIMINUTO = [
@@ -98,9 +99,9 @@ const PREGUNTAS_FRECUENTES = [
       'Debes presentar tu carné institucional vigente (o documento de identidad) en el punto de custodia de la sede indicada y acreditar una prueba o seña particular de propiedad (factura, fondo de pantalla, contenido o número de serie completo).',
   },
   {
-    pregunta: '¿Por qué aparecen censurados los números de serie y datos personales?',
+    pregunta: '¿Por qué debo iniciar sesión para ver los objetos custodiados?',
     respuesta:
-      'En cumplimiento de la Ley Estatutaria 1581 de 2012 (Habeas Data), FindCampus oculta automáticamente seriales, IMEI e identificaciones en el catálogo público para proteger tu privacidad y evitar reclamos fraudulentos por terceros.',
+      'En cumplimiento de la Ley Estatutaria 1581 de 2012 (Habeas Data), restringimos la visualización del catálogo detallado únicamente a miembros autenticados de la comunidad UNIMINUTO y censuramos seriales e identificaciones para evitar reclamos fraudulentos.',
   },
   {
     pregunta: '¿Qué pasa si mi objeto aún no aparece en el catálogo?',
@@ -147,6 +148,7 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
   cargando = false,
   usuarioActual,
   onSolicitarReclamo,
+  onAbrirLogin,
 }) => {
   const [busqueda, setBusqueda] = useState('');
   const [sedeFiltro, setSedeFiltro] = useState('Todas las sedes');
@@ -303,6 +305,10 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
   };
 
   const filtrarPorSedeYSubir = (sede: string) => {
+    if (!usuarioActual) {
+      onAbrirLogin?.();
+      return;
+    }
     setSedeFiltro(sede);
     const seccion = document.getElementById('catalogo-objetos');
     seccion?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -348,61 +354,65 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
           </div>
         </div>
 
-        {/* Barra de Búsqueda, Sede y Categoría */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-12 gap-3 p-2.5 rounded-2xl bg-[#081326]/70 border border-blue-900/50">
-          <div className="md:col-span-6 relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Buscar por marca, color, edificio o radicado..."
-              className="w-full pl-11 pr-4 py-3 rounded-xl bg-[#081326] border border-blue-900/60 focus:border-yellow-400 text-sm text-white placeholder-slate-400 outline-none transition-colors"
-            />
-          </div>
+        {/* Barra de Búsqueda visible solo cuando el usuario está autenticado */}
+        {usuarioActual && (
+          <>
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-12 gap-3 p-2.5 rounded-2xl bg-[#081326]/70 border border-blue-900/50">
+              <div className="md:col-span-6 relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  placeholder="Buscar por marca, color, edificio o radicado..."
+                  className="w-full pl-11 pr-4 py-3 rounded-xl bg-[#081326] border border-blue-900/60 focus:border-yellow-400 text-sm text-white placeholder-slate-400 outline-none transition-colors"
+                />
+              </div>
 
-          <div className="md:col-span-3 relative">
-            <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <select
-              value={sedeFiltro}
-              onChange={(e) => setSedeFiltro(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#081326] border border-blue-900/60 focus:border-yellow-400 text-sm text-white outline-none cursor-pointer"
-            >
-              {SEDES_UNIMINUTO.map((sede) => (
-                <option key={sede} value={sede} className="bg-[#0e1e38] text-white">
-                  {sede}
-                </option>
-              ))}
-            </select>
-          </div>
+              <div className="md:col-span-3 relative">
+                <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <select
+                  value={sedeFiltro}
+                  onChange={(e) => setSedeFiltro(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#081326] border border-blue-900/60 focus:border-yellow-400 text-sm text-white outline-none cursor-pointer"
+                >
+                  {SEDES_UNIMINUTO.map((sede) => (
+                    <option key={sede} value={sede} className="bg-[#0e1e38] text-white">
+                      {sede}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <div className="md:col-span-3 relative">
-            <SlidersHorizontal className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <select
-              value={categoriaFiltro}
-              onChange={(e) => setCategoriaFiltro(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#081326] border border-blue-900/60 focus:border-yellow-400 text-sm text-white outline-none cursor-pointer"
-            >
-              {CATEGORIAS.map((cat) => (
-                <option key={cat} value={cat} className="bg-[#0e1e38] text-white">
-                  {cat.replace('_', ' ')}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+              <div className="md:col-span-3 relative">
+                <SlidersHorizontal className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <select
+                  value={categoriaFiltro}
+                  onChange={(e) => setCategoriaFiltro(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#081326] border border-blue-900/60 focus:border-yellow-400 text-sm text-white outline-none cursor-pointer"
+                >
+                  {CATEGORIAS.map((cat) => (
+                    <option key={cat} value={cat} className="bg-[#0e1e38] text-white">
+                      {cat.replace('_', ' ')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
-        <div className="mt-4 flex items-center justify-end">
-          <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-300 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={soloDisponibles}
-              onChange={(e) => setSoloDisponibles(e.target.checked)}
-              className="rounded border-blue-800 text-yellow-400 focus:ring-yellow-400"
-            />
-            <span>Mostrar solo disponibles en custodia</span>
-          </label>
-        </div>
+            <div className="mt-4 flex items-center justify-end">
+              <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-300 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={soloDisponibles}
+                  onChange={(e) => setSoloDisponibles(e.target.checked)}
+                  className="rounded border-blue-800 text-yellow-400 focus:ring-yellow-400"
+                />
+                <span>Mostrar solo disponibles en custodia</span>
+              </label>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Banner de Alerta Temprana */}
@@ -448,8 +458,45 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
         </div>
       )}
 
-      {/* Grid de Objetos */}
-      {cargando ? (
+      {/* Catálogo protegido por inicio de sesión */}
+      {!usuarioActual ? (
+        <div className="rounded-3xl bg-[#0e1e38]/90 border border-yellow-400/35 p-8 sm:p-12 text-center space-y-5 shadow-2xl">
+          <div className="w-14 h-14 rounded-2xl bg-yellow-400/15 border border-yellow-400/40 flex items-center justify-center mx-auto text-yellow-400">
+            <Lock className="w-7 h-7" />
+          </div>
+          <div className="max-w-lg mx-auto space-y-2">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-yellow-400">
+              CATÁLOGO PROTEGIDO • LEY 1581 DE 2012
+            </span>
+            <h2 className="text-2xl font-black text-white">
+              Inicia sesión para consultar los objetos en custodia
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              Por seguridad institucional y protección de datos personales, el inventario
+              de bienes hallados en campus está disponible únicamente para miembros
+              registrados de la comunidad UNIMINUTO.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+            <button
+              type="button"
+              onClick={onAbrirLogin}
+              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg shadow-yellow-400/20 transition-transform hover:scale-[1.02] cursor-pointer"
+            >
+              <UserCheck className="w-4 h-4" />
+              <span>Ingresar o Crear Cuenta</span>
+            </button>
+            <button
+              type="button"
+              onClick={abrirModalAlerta}
+              className="inline-flex items-center gap-2 px-5 py-3.5 rounded-2xl bg-[#081326] hover:bg-blue-950 text-slate-200 border border-blue-900/60 font-bold text-xs sm:text-sm cursor-pointer"
+            >
+              <BellRing className="w-4 h-4 text-yellow-400" />
+              <span>Reportar Extravío</span>
+            </button>
+          </div>
+        </div>
+      ) : cargando ? (
         <div className="text-center py-16 text-slate-400 text-sm">
           Consultando bienes registrados en custodia...
         </div>
@@ -615,8 +662,8 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
                 1
               </span>
               <span>
-                <strong>Consulta el catálogo:</strong> Filtra por tu sede y categoría para
-                verificar si ya fue entregado en portería.
+                <strong>Inicia sesión y consulta el catálogo:</strong> Filtra por tu sede
+                y categoría para verificar si ya fue entregado en portería.
               </span>
             </li>
             <li className="flex items-start gap-2.5">
@@ -686,7 +733,7 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
               Puntos de Custodia y Entrega por Sede
             </h2>
           </div>
-          {sedeFiltro !== 'Todas las sedes' && (
+          {usuarioActual && sedeFiltro !== 'Todas las sedes' && (
             <button
               type="button"
               onClick={() => setSedeFiltro('Todas las sedes')}
@@ -699,7 +746,7 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {PUNTOS_ATENCION_SEDES.map((item) => {
-            const seleccionada = sedeFiltro === item.sede;
+            const seleccionada = usuarioActual && sedeFiltro === item.sede;
             return (
               <div
                 key={item.sede}
@@ -726,7 +773,9 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
                   onClick={() => filtrarPorSedeYSubir(item.sede)}
                   className="text-left text-xs font-bold text-yellow-400 hover:text-yellow-300 cursor-pointer"
                 >
-                  Filtrar objetos en esta sede →
+                  {usuarioActual
+                    ? 'Filtrar objetos en esta sede →'
+                    : 'Ingresar para ver objetos de esta sede →'}
                 </button>
               </div>
             );

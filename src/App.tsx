@@ -24,6 +24,7 @@ export function App() {
 
   const [vistaActiva, setVistaActiva] = useState<VistaActiva>('CATALOGO');
   const [objetos, setObjetos] = useState<ObjetoCustodia[]>(INVENTARIO_INICIAL);
+  const [modalAuthAbierto, setModalAuthAbierto] = useState(false);
 
   const rol = usuario?.rol ?? 'ESTUDIANTE';
 
@@ -110,6 +111,8 @@ export function App() {
         onIniciarSesion={manejarIniciarSesion}
         onCerrarSesion={manejarCerrarSesion}
         totalEnCustodia={totalEnCustodia}
+        modalAuthAbierto={modalAuthAbierto}
+        setModalAuthAbierto={setModalAuthAbierto}
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -118,6 +121,7 @@ export function App() {
             objetos={objetos}
             usuarioActual={usuario}
             onSolicitarReclamo={solicitarReclamo}
+            onAbrirLogin={() => setModalAuthAbierto(true)}
           />
         )}
         {rol === 'ADMIN' && vistaActiva === 'CUSTODIA' && (
