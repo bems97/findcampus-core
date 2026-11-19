@@ -14,6 +14,7 @@ import {
   FileText,
   Printer,
   ArrowUpRight,
+  Send,
 } from 'lucide-react';
 import type { ObjetoCustodia } from '../types/campus';
 
@@ -141,6 +142,15 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
   });
   const [actaGenerada, setActaGenerada] = useState<DatosActaRestitucion | null>(null);
   const [procesandoRestitucion, setProcesandoRestitucion] = useState(false);
+
+  // Estado para reenvío de acta por correo
+  const [actaParaCorreo, setActaParaCorreo] = useState<DatosActaRestitucion | null>(null);
+  const [correoDestinoActa, setCorreoDestinoActa] = useState('');
+  const [enviandoCorreoActa, setEnviandoCorreoActa] = useState(false);
+  const [feedbackCorreoActa, setFeedbackCorreoActa] = useState<{
+    tipo: 'ok' | 'err';
+    texto: string;
+  } | null>(null);
 
   const cargarAlertas = async () => {
     setCargandoAlertas(true);
@@ -342,14 +352,12 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
     };
 
     try {
-      // 1. Persistir acta en MongoDB y enviar correo de constancia
       await fetch('/api/actas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(nuevaActa),
       });
 
-      // 2. Actualizar estado del objeto a RESTITUIDO
       if (onRestituirObjeto) {
         await onRestituirObjeto(targetId);
       } else {
@@ -372,6 +380,51 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
       console.error('Error generando acta de restitución:', err);
     } finally {
       setProcesandoRestitucion(false);
+    }
+  };
+
+  const abrirModalEnviarCorreoActa = (acta: DatosActaRestitucion) => {
+    setActaParaCorreo(acta);
+    setCorreoDestinoActa(acta.correo_reclamante || '');
+    setFeedbackCorreoActa(null);
+  };
+
+  const ejecutarEnvioCorreoActa = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!actaParaCorreo) return;
+
+    setEnviandoCorreoActa(true);
+    setFeedbackCorreoActa(null);
+
+    try {
+      const res = await fetch('/api/actas', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          radicado_id: actaParaCorreo.radicado_id,
+          numero_acta: actaParaCorreo.numero_acta,
+          correo_destino: correoDestinoActa.trim(),
+          acta_fallback: actaParaCorreo,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'No se pudo enviar el correo.');
+      }
+
+      setFeedbackCorreoActa({
+        tipo: 'ok',
+        texto: data.mensaje || `Acta enviada correctamente a ${correoDestinoActa}.`,
+      });
+      await cargarActas();
+    } catch (err) {
+      setFeedbackCorreoActa({
+        tipo: 'err',
+        texto: err instanceof Error ? err.message : 'Error enviando constancia por correo.',
+      });
+    } finally {
+      setEnviandoCorreoActa(false);
     }
   };
 
@@ -893,8 +946,8 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
                 Control de Custodia y Actas de Entrega
               </h3>
               <p className="text-xs text-slate-300">
-                Cada acta firmada queda respaldada en MongoDB Atlas y envía constancia al
-                reclamante.
+                Cada acta firmada queda respaldada en MongoDB Atlas y permite envío por
+                correo o impresión PDF.
               </p>
             </div>
             <div className="relative w-full sm:w-72">
@@ -925,6 +978,21 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
                   const actaExistente = actasGuardadas.find(
                     (a) => a.radicado_id === obj.radicado_id
                   );
+
+                  const datosActaActual: DatosActaRestitucion = actaExistente || {
+                    numero_acta: `ACTA-${obj.radicado_id.replace('FIND-', '')}`,
+                    radicado_id: obj.radicado_id,
+                    titulo_bien: obj.titulo,
+                    categoria: String(obj.categoria),
+                    sede: obj.sede,
+                    edificio: obj.edificio || 'Portería Principal',
+                    nombre_reclamante: 'Titular Validado en Custodia',
+                    id_institucional: 'Verificado en Portería',
+                    correo_reclamante: '',
+                    observaciones_entrega:
+                      'Bien restituido conforme a protocolo institucional UNIMINUTO.',
+                    fecha_hora: new Date().toLocaleString('es-CO'),
+                  };
 
                   return (
                     <tr key={obj._id || obj.radicado_id}>
@@ -957,33 +1025,30 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
                             <span>Restituir con Acta</span>
                           </button>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              imprimirActaPDF(
-                                actaExistente || {
-                                  numero_acta: `ACTA-${obj.radicado_id.replace('FIND-', '')}`,
-                                  radicado_id: obj.radicado_id,
-                                  titulo_bien: obj.titulo,
-                                  categoria: String(obj.categoria),
-                                  sede: obj.sede,
-                                  edificio: obj.edificio || 'Portería Principal',
-                                  nombre_reclamante: 'Titular Validado en Custodia',
-                                  id_institucional: 'Verificado en Portería',
-                                  correo_reclamante: '',
-                                  observaciones_entrega:
-                                    'Bien restituido conforme a protocolo institucional UNIMINUTO.',
-                                  fecha_hora: new Date().toLocaleString('es-CO'),
-                                }
-                              )
-                            }
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-950 hover:bg-blue-900 text-yellow-300 font-bold cursor-pointer"
-                          >
-                            <Printer className="w-3.5 h-3.5" />
-                            <span>
-                              {actaExistente ? `Imprimir ${actaExistente.numero_acta}` : 'Imprimir Copia'}
-                            </span>
-                          </button>
+                          <div className="inline-flex flex-wrap items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => abrirModalEnviarCorreoActa(datosActaActual)}
+                              title="Enviar constancia de acta por correo"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/35 font-bold cursor-pointer"
+                            >
+                              <Mail className="w-3.5 h-3.5" />
+                              <span>Enviar Correo</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => imprimirActaPDF(datosActaActual)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-950 hover:bg-blue-900 text-yellow-300 font-bold cursor-pointer"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                              <span>
+                                {actaExistente
+                                  ? `Imprimir ${actaExistente.numero_acta}`
+                                  : 'Imprimir Copia'}
+                              </span>
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -1160,13 +1225,25 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
               </p>
             </div>
 
-            <div className="flex items-center justify-end gap-3">
+            <div className="flex flex-wrap items-center justify-end gap-2.5">
               <button
                 type="button"
                 onClick={() => setActaGenerada(null)}
                 className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:bg-blue-950 cursor-pointer"
               >
                 Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const copia = actaGenerada;
+                  setActaGenerada(null);
+                  abrirModalEnviarCorreoActa(copia);
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold text-xs cursor-pointer"
+              >
+                <Mail className="w-4 h-4" />
+                <span>Enviar por Correo</span>
               </button>
               <button
                 type="button"
@@ -1177,6 +1254,87 @@ export const PanelCustodia: React.FC<PanelCustodiaProps> = ({
                 <span>Imprimir / Guardar PDF</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: ENVIAR / REENVIAR ACTA POR CORREO */}
+      {actaParaCorreo && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-3xl bg-[#0e1e38] border border-emerald-400/40 shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 bg-[#081326] border-b border-blue-900/60 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-400">
+                  CONSTANCIA DIGITAL • SMTP
+                </span>
+                <h3 className="text-base font-extrabold text-white">
+                  Enviar {actaParaCorreo.numero_acta}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActaParaCorreo(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={ejecutarEnvioCorreoActa} className="p-6 space-y-4">
+              <div className="rounded-xl bg-[#081326] border border-blue-900/50 p-3 text-xs text-slate-300 space-y-1">
+                <p>
+                  <strong>Bien:</strong> {actaParaCorreo.titulo_bien} (
+                  {actaParaCorreo.radicado_id})
+                </p>
+                <p>
+                  <strong>Titular:</strong> {actaParaCorreo.nombre_reclamante}
+                </p>
+              </div>
+
+              {feedbackCorreoActa && (
+                <div
+                  className={`p-3 rounded-xl text-xs font-semibold border ${
+                    feedbackCorreoActa.tipo === 'ok'
+                      ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-200'
+                      : 'bg-red-500/15 border-red-500/40 text-red-200'
+                  }`}
+                >
+                  {feedbackCorreoActa.texto}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                  Correo Electrónico de Destino *
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={correoDestinoActa}
+                  onChange={(e) => setCorreoDestinoActa(e.target.value)}
+                  placeholder="estudiante@uniminuto.edu.co"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#081326] border border-blue-900/60 focus:border-yellow-400 text-sm text-white outline-none"
+                />
+              </div>
+
+              <div className="pt-1 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setActaParaCorreo(null)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:bg-blue-950 cursor-pointer"
+                >
+                  Cerrar
+                </button>
+                <button
+                  type="submit"
+                  disabled={enviandoCorreoActa}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 disabled:opacity-50 text-slate-950 font-extrabold text-xs sm:text-sm cursor-pointer"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>{enviandoCorreoActa ? 'Enviando...' : 'Enviar Constancia'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
