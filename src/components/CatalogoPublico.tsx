@@ -13,6 +13,10 @@ import {
   Send,
   SlidersHorizontal,
   UserCheck,
+  HelpCircle,
+  HandHeart,
+  ChevronDown,
+  Building2,
 } from 'lucide-react';
 import type { ObjetoCustodia } from '../types/campus';
 
@@ -54,6 +58,62 @@ const CATEGORIAS = [
   'OTROS',
 ];
 
+const PUNTOS_ATENCION_SEDES = [
+  {
+    sede: 'Sede Principal',
+    punto: 'Portería Principal Torre A • Oficina de Bienestar',
+    horario: 'Lunes a Sábado • 6:30 a.m. – 9:30 p.m.',
+  },
+  {
+    sede: 'Sede Calle 80',
+    punto: 'Recepción Central y Módulo de Seguridad Física',
+    horario: 'Lunes a Sábado • 6:30 a.m. – 9:30 p.m.',
+  },
+  {
+    sede: 'Sede Perdomo',
+    punto: 'Portería Acceso Peatonal • Coordinación de Sede',
+    horario: 'Lunes a Sábado • 7:00 a.m. – 9:00 p.m.',
+  },
+  {
+    sede: 'Centro Regional Soacha',
+    punto: 'Módulo de Atención Integral y Vigilancia',
+    horario: 'Lunes a Sábado • 7:00 a.m. – 9:00 p.m.',
+  },
+  {
+    sede: 'Centro Regional Zipaquirá',
+    punto: 'Recepción Administrativa y Seguridad Campus',
+    horario: 'Lunes a Sábado • 7:00 a.m. – 8:30 p.m.',
+  },
+  {
+    sede: 'Centro Regional Madrid',
+    punto: 'Portería Principal y Bienestar Universitario',
+    horario: 'Lunes a Sábado • 7:00 a.m. – 8:30 p.m.',
+  },
+];
+
+const PREGUNTAS_FRECUENTES = [
+  {
+    pregunta: '¿Qué necesito presentar para reclamar mi pertenencia?',
+    respuesta:
+      'Debes presentar tu carné institucional vigente (o documento de identidad) en el punto de custodia de la sede indicada y acreditar una prueba o seña particular de propiedad (factura, fondo de pantalla, contenido o número de serie completo).',
+  },
+  {
+    pregunta: '¿Por qué aparecen censurados los números de serie y datos personales?',
+    respuesta:
+      'En cumplimiento de la Ley Estatutaria 1581 de 2012 (Habeas Data), FindCampus oculta automáticamente seriales, IMEI e identificaciones en el catálogo público para proteger tu privacidad y evitar reclamos fraudulentos por terceros.',
+  },
+  {
+    pregunta: '¿Qué pasa si mi objeto aún no aparece en el catálogo?',
+    respuesta:
+      'Activa una Alerta Temprana con la descripción y ubicación aproximada. Nuestro sistema cruza continuamente los nuevos ingresos de todas las sedes y te enviará una notificación automática a tu correo en cuanto sea registrado.',
+  },
+  {
+    pregunta: '¿Cuánto tiempo permanecen los objetos en custodia?',
+    respuesta:
+      'Los bienes se resguardan en el almacén de custodia durante el periodo académico vigente. Al finalizar el semestre, los elementos no reclamados pasan a gestión institucional de Bienestar Universitario.',
+  },
+];
+
 function comprimirImagen(file: File, maxAncho = 800, calidad = 0.72): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -92,6 +152,7 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
   const [sedeFiltro, setSedeFiltro] = useState('Todas las sedes');
   const [categoriaFiltro, setCategoriaFiltro] = useState('Todas las categorías');
   const [soloDisponibles, setSoloDisponibles] = useState(false);
+  const [faqAbierta, setFaqAbierta] = useState<number | null>(0);
 
   const [modalAlertaAbierto, setModalAlertaAbierto] = useState(false);
   const [enviandoAlerta, setEnviandoAlerta] = useState(false);
@@ -241,8 +302,14 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
     }
   };
 
+  const filtrarPorSedeYSubir = (sede: string) => {
+    setSedeFiltro(sede);
+    const seccion = document.getElementById('catalogo-objetos');
+    seccion?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
-    <section id="catalogo-objetos" className="space-y-8">
+    <section id="catalogo-objetos" className="space-y-10">
       {/* Hero Institucional */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0e1e38] via-[#0b182e] to-[#081326] border border-blue-900/50 p-6 sm:p-10 shadow-2xl">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
@@ -530,6 +597,179 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
           })}
         </div>
       )}
+
+      {/* SECCIÓN INFORMATIVA PARA LA COMUNIDAD UNIVERSITARIA */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
+        {/* Tarjeta 1: Si perdiste algo */}
+        <div className="rounded-3xl bg-[#0e1e38]/90 border border-blue-900/50 p-6 sm:p-7 space-y-4 shadow-xl">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-400/10 border border-yellow-400/30 text-yellow-400 text-xs font-bold">
+            <BellRing className="w-3.5 h-3.5" />
+            <span>Guía Rápida para Estudiantes y Docentes</span>
+          </div>
+          <h2 className="text-xl font-extrabold text-white">
+            ¿Perdiste una pertenencia en el campus?
+          </h2>
+          <ol className="space-y-2.5 text-xs sm:text-sm text-slate-300">
+            <li className="flex items-start gap-2.5">
+              <span className="w-5 h-5 rounded-full bg-yellow-400 text-slate-950 font-black text-xs flex items-center justify-center shrink-0 mt-0.5">
+                1
+              </span>
+              <span>
+                <strong>Consulta el catálogo:</strong> Filtra por tu sede y categoría para
+                verificar si ya fue entregado en portería.
+              </span>
+            </li>
+            <li className="flex items-start gap-2.5">
+              <span className="w-5 h-5 rounded-full bg-yellow-400 text-slate-950 font-black text-xs flex items-center justify-center shrink-0 mt-0.5">
+                2
+              </span>
+              <span>
+                <strong>Activa una Alerta Temprana:</strong> Si aún no aparece, regístrala
+                y recibirás un correo automático en cuanto ingrese.
+              </span>
+            </li>
+            <li className="flex items-start gap-2.5">
+              <span className="w-5 h-5 rounded-full bg-yellow-400 text-slate-950 font-black text-xs flex items-center justify-center shrink-0 mt-0.5">
+                3
+              </span>
+              <span>
+                <strong>Valida y recibe tu Acta Digital:</strong> Acércate con tu carné
+                institucional para firmar la restitución segura.
+              </span>
+            </li>
+          </ol>
+        </div>
+
+        {/* Tarjeta 2: Si encontraste algo */}
+        <div className="rounded-3xl bg-[#0e1e38]/90 border border-blue-900/50 p-6 sm:p-7 flex flex-col justify-between gap-4 shadow-xl">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-400/30 text-emerald-300 text-xs font-bold">
+              <HandHeart className="w-3.5 h-3.5" />
+              <span>Cultura Ciudadana UNIMINUTO</span>
+            </div>
+            <h2 className="text-xl font-extrabold text-white">
+              ¿Encontraste un objeto olvidado?
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              Entrégalo en la <strong>portería principal</strong> o en la oficina de{' '}
+              <strong>Bienestar Universitario</strong> de tu sede. Nuestro personal lo
+              registrará con un código de radicado oficial y protegerá los datos
+              personales de su dueño hasta devolvérselo.
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-[#081326] border border-blue-900/60 p-4 flex items-center justify-between gap-3">
+            <div className="text-xs text-slate-300">
+              <strong className="text-white block">¿Necesitas ayuda inmediata?</strong>
+              <span>Pregunta a Unimi IA en la esquina inferior derecha.</span>
+            </div>
+            <button
+              type="button"
+              onClick={abrirModalAlerta}
+              className="px-4 py-2 rounded-xl bg-yellow-400/15 hover:bg-yellow-400 text-yellow-300 hover:text-slate-950 border border-yellow-400/40 text-xs font-extrabold transition-colors cursor-pointer shrink-0"
+            >
+              Crear Alerta
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* DIRECTORIO DE PUNTOS DE CUSTODIA POR SEDE */}
+      <div className="rounded-3xl bg-[#0e1e38]/80 border border-blue-900/50 p-6 sm:p-8 space-y-5 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <div className="inline-flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wider text-yellow-400">
+              <Building2 className="w-4 h-4" />
+              <span>Cobertura Multicampus</span>
+            </div>
+            <h2 className="text-xl font-extrabold text-white mt-0.5">
+              Puntos de Custodia y Entrega por Sede
+            </h2>
+          </div>
+          {sedeFiltro !== 'Todas las sedes' && (
+            <button
+              type="button"
+              onClick={() => setSedeFiltro('Todas las sedes')}
+              className="text-xs font-bold text-yellow-400 hover:underline cursor-pointer self-start sm:self-auto"
+            >
+              Ver todas las sedes
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {PUNTOS_ATENCION_SEDES.map((item) => {
+            const seleccionada = sedeFiltro === item.sede;
+            return (
+              <div
+                key={item.sede}
+                className={`rounded-2xl p-4 border transition-colors flex flex-col justify-between gap-3 ${
+                  seleccionada
+                    ? 'bg-yellow-400/10 border-yellow-400/60'
+                    : 'bg-[#081326] border-blue-900/50 hover:border-blue-700'
+                }`}
+              >
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-yellow-400 shrink-0" />
+                    <h3 className="font-extrabold text-sm text-white">{item.sede}</h3>
+                  </div>
+                  <p className="text-xs text-slate-300">{item.punto}</p>
+                  <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                    <Clock className="w-3 h-3 text-yellow-400/80 shrink-0" />
+                    <span>{item.horario}</span>
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => filtrarPorSedeYSubir(item.sede)}
+                  className="text-left text-xs font-bold text-yellow-400 hover:text-yellow-300 cursor-pointer"
+                >
+                  Filtrar objetos en esta sede →
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* PREGUNTAS FRECUENTES (FAQ) */}
+      <div className="rounded-3xl bg-[#0e1e38]/80 border border-blue-900/50 p-6 sm:p-8 space-y-4 shadow-xl">
+        <div className="flex items-center gap-2">
+          <HelpCircle className="w-5 h-5 text-yellow-400" />
+          <h2 className="text-xl font-extrabold text-white">
+            Preguntas Frecuentes de la Comunidad
+          </h2>
+        </div>
+
+        <div className="divide-y divide-blue-950">
+          {PREGUNTAS_FRECUENTES.map((faq, idx) => {
+            const abierta = faqAbierta === idx;
+            return (
+              <div key={faq.pregunta} className="py-3.5 first:pt-1 last:pb-1">
+                <button
+                  type="button"
+                  onClick={() => setFaqAbierta(abierta ? null : idx)}
+                  className="w-full flex items-center justify-between gap-4 text-left font-bold text-xs sm:text-sm text-white hover:text-yellow-300 transition-colors cursor-pointer"
+                >
+                  <span>{faq.pregunta}</span>
+                  <ChevronDown
+                    className={`w-4 h-4 text-yellow-400 shrink-0 transition-transform ${
+                      abierta ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
+                {abierta && (
+                  <p className="mt-2 text-xs sm:text-sm text-slate-300 leading-relaxed pr-6">
+                    {faq.respuesta}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Modal de Solicitud de Reclamo */}
       {objetoReclamo && (
