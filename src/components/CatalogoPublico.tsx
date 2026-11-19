@@ -183,6 +183,8 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
     foto_referencia: '',
   });
 
+  const esAdmin = usuarioActual?.rol === 'ADMIN';
+
   const objetosFiltrados = useMemo(() => {
     return objetos.filter((obj) => {
       const coincideSede =
@@ -347,10 +349,12 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
               <span>Reportar Objeto Extraviado</span>
             </button>
 
-            <div className="px-5 py-2.5 rounded-2xl bg-[#081326]/90 border border-blue-900/60 text-center text-xs text-slate-300">
-              Tasa de recuperación:{' '}
-              <strong className="text-yellow-400 font-extrabold">86.4%</strong>
-            </div>
+            {esAdmin && (
+              <div className="px-5 py-2.5 rounded-2xl bg-[#081326]/90 border border-blue-900/60 text-center text-xs text-slate-300">
+                Tasa de recuperación:{' '}
+                <strong className="text-yellow-400 font-extrabold">86.4%</strong>
+              </div>
+            )}
           </div>
         </div>
 
