@@ -21,84 +21,68 @@ const SUGERENCIAS_RAPIDAS = [
 ];
 
 const ESTILOS_UNIMI = `
-  @keyframes unimiFloat {
+  @keyframes unimiBob {
     0%, 100% { transform: translateY(0px) rotate(0deg); }
-    50% { transform: translateY(-3px) rotate(2deg); }
+    50% { transform: translateY(-3px) rotate(1.5deg); }
   }
   @keyframes unimiListen {
-    0%, 100% { transform: translateY(1.5px) rotate(-4deg); }
-    50% { transform: translateY(2.5px) rotate(-2deg); }
+    0%, 100% { transform: translateY(2px) rotate(-5deg); }
+    50% { transform: translateY(3px) rotate(-2deg); }
   }
   @keyframes unimiThink {
-    0%, 100% { transform: rotate(-9deg) translateY(-1.5px); }
-    50% { transform: rotate(9deg) translateY(-2.5px); }
+    0%, 100% { transform: rotate(-9deg) translateY(-1px); }
+    50% { transform: rotate(9deg) translateY(-3px); }
   }
   @keyframes unimiHappy {
     0%, 100% { transform: translateY(0px) scale(1); }
-    30% { transform: translateY(-5px) scale(1.07); }
-    65% { transform: translateY(-1px) scale(0.97); }
+    35% { transform: translateY(-6px) scale(1.06); }
+    70% { transform: translateY(-1px) scale(0.98); }
   }
-  @keyframes earLeft {
+  @keyframes earFlapL {
     0%, 100% { transform: rotate(0deg); }
-    30% { transform: rotate(11deg); }
+    30% { transform: rotate(12deg); }
     65% { transform: rotate(-5deg); }
   }
-  @keyframes earRight {
+  @keyframes earFlapR {
     0%, 100% { transform: rotate(0deg); }
-    30% { transform: rotate(-11deg); }
+    30% { transform: rotate(-12deg); }
     65% { transform: rotate(5deg); }
   }
-  @keyframes earAlert {
-    0%, 100% { transform: rotate(-14deg) translateY(-2px); }
-    50% { transform: rotate(-10deg) translateY(-3px); }
+  @keyframes tailWag {
+    0%, 100% { transform: rotate(-14deg); }
+    50% { transform: rotate(22deg); }
   }
-  @keyframes tailWagSlow {
-    0%, 100% { transform: rotate(-10deg); }
-    50% { transform: rotate(18deg); }
+  @keyframes tailWagSuper {
+    0%, 100% { transform: rotate(-24deg); }
+    50% { transform: rotate(30deg); }
   }
-  @keyframes tailWagFast {
-    0%, 100% { transform: rotate(-22deg); }
-    50% { transform: rotate(28deg); }
-  }
-  @keyframes pawWave {
-    0%, 100% { transform: rotate(0deg) translateY(0px); }
-    25% { transform: rotate(-18deg) translateY(-4px); }
-    50% { transform: rotate(8deg) translateY(-2px); }
-    75% { transform: rotate(-15deg) translateY(-4px); }
-  }
-  @keyframes unimiBlink {
+  @keyframes blinkEyes {
     0%, 91%, 100% { transform: scaleY(1); }
     95% { transform: scaleY(0.08); }
   }
-  @keyframes unimiTongue {
+  @keyframes tonguePant {
     0%, 100% { transform: translateY(0px) scaleY(1); }
-    50% { transform: translateY(1.5px) scaleY(1.16); }
-  }
-  @keyframes searchOrbit {
-    0% { transform: rotate(0deg) translateX(3px) rotate(0deg); }
-    100% { transform: rotate(360deg) translateX(3px) rotate(-360deg); }
+    50% { transform: translateY(1.6px) scaleY(1.18); }
   }
 
-  .unimi-head-idle { transform-origin: 60px 60px; animation: unimiFloat 3s ease-in-out infinite; }
-  .unimi-head-listening { transform-origin: 60px 60px; animation: unimiListen 1.4s ease-in-out infinite; }
-  .unimi-head-thinking { transform-origin: 60px 60px; animation: unimiThink 0.95s ease-in-out infinite; }
-  .unimi-head-happy { transform-origin: 60px 60px; animation: unimiHappy 0.65s ease-in-out infinite; }
+  .unimi-head-idle { transform-origin: 70px 64px; animation: unimiBob 3.1s ease-in-out infinite; }
+  .unimi-head-listening { transform-origin: 70px 64px; animation: unimiListen 1.4s ease-in-out infinite; }
+  .unimi-head-thinking { transform-origin: 70px 64px; animation: unimiThink 0.9s ease-in-out infinite; }
+  .unimi-head-happy { transform-origin: 70px 64px; animation: unimiHappy 0.65s ease-in-out infinite; }
 
-  .unimi-ear-left { transform-origin: 39px 46px; animation: earLeft 2.6s ease-in-out infinite; }
-  .unimi-ear-right { transform-origin: 81px 46px; animation: earRight 2.6s ease-in-out infinite; }
-  .unimi-ear-alert { transform-origin: 39px 46px; animation: earAlert 0.9s ease-in-out infinite; }
+  .unimi-ear-l { transform-origin: 45px 46px; animation: earFlapL 2.7s ease-in-out infinite; }
+  .unimi-ear-r { transform-origin: 95px 46px; animation: earFlapR 2.7s ease-in-out infinite; }
 
-  .unimi-tail-slow { transform-origin: 82px 92px; animation: tailWagSlow 1.1s ease-in-out infinite; }
-  .unimi-tail-fast { transform-origin: 82px 92px; animation: tailWagFast 0.35s ease-in-out infinite; }
-  .unimi-paw-wave { transform-origin: 43px 94px; animation: pawWave 0.8s ease-in-out infinite; }
+  .unimi-tail { transform-origin: 96px 104px; animation: tailWag 1.1s ease-in-out infinite; }
+  .unimi-tail-fast { transform-origin: 96px 104px; animation: tailWagSuper 0.35s ease-in-out infinite; }
 
-  .unimi-eyes { transform-origin: 60px 52px; animation: unimiBlink 4s infinite; }
-  .unimi-tongue { transform-origin: 60px 71px; animation: unimiTongue 1.4s ease-in-out infinite; }
-  .unimi-magnifier { transform-origin: 88px 72px; animation: searchOrbit 1.8s linear infinite; }
+  .unimi-blink { transform-origin: 70px 56px; animation: blinkEyes 4s infinite; }
+  .unimi-tongue { transform-origin: 70px 79px; animation: tonguePant 1.4s ease-in-out infinite; }
 `;
 
-const MascotaUnimi: React.FC<{ className?: string; estado?: EstadoUnimi }> = ({
-  className = 'w-11 h-11',
+/* Perrito caricaturesco sin círculo contenedor para sobresalir sobre el botón flotante */
+const PerritoFlotanteUnimi: React.FC<{ className?: string; estado?: EstadoUnimi }> = ({
+  className = 'w-20 h-20',
   estado = 'idle',
 }) => {
   const claseCabeza =
@@ -110,156 +94,187 @@ const MascotaUnimi: React.FC<{ className?: string; estado?: EstadoUnimi }> = ({
           ? 'unimi-head-listening'
           : 'unimi-head-idle';
 
-  const claseCola =
-    estado === 'happy' || estado === 'thinking' ? 'unimi-tail-fast' : 'unimi-tail-slow';
-
-  const offsetOjosY = estado === 'listening' ? 2.2 : 0;
-
   return (
     <svg
-      viewBox="0 0 120 120"
+      viewBox="0 0 140 135"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
       aria-label="Mascota Unimi IA"
     >
-      {/* Fondo circular institucional */}
-      <circle cx="60" cy="60" r="56" fill="#0E1E38" stroke="#FACC15" strokeWidth="4.5" />
+      {/* Sombra suave detrás */}
+      <ellipse cx="70" cy="122" rx="42" ry="7" fill="rgba(4, 10, 23, 0.45)" />
 
-      {/* Colita animada */}
+      {/* Colita alegre */}
       <path
-        className={claseCola}
-        d="M80 92C92 88 99 77 95 70C91 65 84 74 79 84"
+        className={estado === 'happy' || estado === 'thinking' ? 'unimi-tail-fast' : 'unimi-tail'}
+        d="M95 104C112 99 121 86 116 78C111 72 102 82 94 94"
         fill="#D97706"
-        stroke="#B45309"
-        strokeWidth="2"
+        stroke="#78350F"
+        strokeWidth="3"
         strokeLinecap="round"
       />
 
-      {/* Cuerpito / Chaleco institucional UNIMINUTO */}
-      <path d="M36 82C36 74 84 74 84 82L80 104H40L36 82Z" fill="#1D4ED8" />
-      {/* Collar dorado y placa */}
-      <path d="M41 79Q60 85 79 79" stroke="#FACC15" strokeWidth="4" strokeLinecap="round" />
-      <circle cx="60" cy="86" r="5" fill="#FACC15" stroke="#0E1E38" strokeWidth="1.5" />
-
-      {/* Patitas delanteras */}
-      <ellipse
-        className={estado === 'happy' ? 'unimi-paw-wave' : ''}
-        cx="45"
-        cy="101"
-        rx="7.5"
-        ry="5.5"
-        fill="#FBBF24"
-        stroke="#B45309"
-        strokeWidth="1.5"
+      {/* Cuerpo sentado */}
+      <path
+        d="M44 90C42 78 98 78 96 90L101 118H39L44 90Z"
+        fill="#F59E0B"
+        stroke="#78350F"
+        strokeWidth="3"
       />
-      <ellipse
-        cx="75"
-        cy="101"
-        rx="7.5"
-        ry="5.5"
-        fill="#FBBF24"
-        stroke="#B45309"
-        strokeWidth="1.5"
-      />
+      {/* Pecho crema */}
+      <ellipse cx="70" cy="103" rx="16" ry="13" fill="#FEF3C7" />
 
-      {/* Cabeza y orejas */}
+      {/* Pañuelo institucional azul UNIMINUTO */}
+      <path
+        d="M43 84Q70 94 97 84L92 95L70 105L48 95L43 84Z"
+        fill="#1D4ED8"
+        stroke="#0F172A"
+        strokeWidth="2.5"
+        strokeLinejoin="round"
+      />
+      {/* Placa dorada */}
+      <circle cx="70" cy="96" r="5.5" fill="#FACC15" stroke="#0F172A" strokeWidth="2" />
+
+      {/* Cabeza y orejas caricaturescas */}
       <g className={claseCabeza}>
-        {/* Oreja izquierda */}
+        {/* Oreja izquierda caída y esponjosa */}
         <path
-          className={estado === 'listening' ? 'unimi-ear-alert' : 'unimi-ear-left'}
-          d="M28 43C19 48 17 65 24 73C29 78 37 73 39 63L41 47L28 43Z"
-          fill="#D97706"
+          className="unimi-ear-l"
+          d="M44 42C29 46 22 66 29 78C34 85 44 80 46 68L49 48L44 42Z"
+          fill="#B45309"
+          stroke="#78350F"
+          strokeWidth="3"
+          strokeLinejoin="round"
         />
-        {/* Oreja derecha */}
+        {/* Oreja derecha caída y esponjosa */}
         <path
-          className="unimi-ear-right"
-          d="M92 43C101 48 103 65 96 73C91 78 83 73 81 63L79 47L92 43Z"
-          fill="#D97706"
+          className="unimi-ear-r"
+          d="M96 42C111 46 118 66 111 78C106 85 96 80 94 68L91 48L96 42Z"
+          fill="#B45309"
+          stroke="#78350F"
+          strokeWidth="3"
+          strokeLinejoin="round"
         />
 
-        {/* Rostro */}
-        <ellipse cx="60" cy="56" rx="27" ry="25" fill="#FBBF24" />
+        {/* Cabeza principal */}
+        <ellipse
+          cx="70"
+          cy="58"
+          rx="31"
+          ry="28"
+          fill="#FBBF24"
+          stroke="#78350F"
+          strokeWidth="3"
+        />
+
+        {/* Mechoncito de pelo en la frente */}
+        <path
+          d="M62 31C65 23 72 23 74 30C77 25 82 27 80 33"
+          fill="#FBBF24"
+          stroke="#78350F"
+          strokeWidth="2.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+
         {/* Hocico */}
-        <ellipse cx="60" cy="65" rx="14.5" ry="11" fill="#FEF3C7" />
+        <ellipse cx="70" cy="69" rx="17.5" ry="13" fill="#FEF3C7" />
 
-        {/* Ojos expresivos */}
-        <g className="unimi-eyes" transform={`translate(0, ${offsetOjosY})`}>
-          {estado === 'happy' ? (
-            <>
-              <path
-                d="M44 52Q48 47 52 52"
-                stroke="#081326"
-                strokeWidth="3"
-                strokeLinecap="round"
-              />
-              <path
-                d="M68 52Q72 47 76 52"
-                stroke="#081326"
-                strokeWidth="3"
-                strokeLinecap="round"
-              />
-            </>
-          ) : (
-            <>
-              <circle cx="48" cy="51" r="4.2" fill="#081326" />
-              <circle cx="72" cy="51" r="4.2" fill="#081326" />
-              <circle cx="49.3" cy="49.7" r="1.4" fill="#FFFFFF" />
-              <circle cx="73.3" cy="49.7" r="1.4" fill="#FFFFFF" />
-            </>
-          )}
+        {/* Cejas expresivas */}
+        <path d="M51 44C55 41 60 41 63 44" stroke="#78350F" strokeWidth="2.8" strokeLinecap="round" />
+        <path d="M77 44C80 41 85 41 89 44" stroke="#78350F" strokeWidth="2.8" strokeLinecap="round" />
+
+        {/* Ojos grandes estilo cartoon */}
+        <g className="unimi-blink">
+          <ellipse cx="57" cy="54" rx="5.5" ry="6.2" fill="#0F172A" />
+          <ellipse cx="83" cy="54" rx="5.5" ry="6.2" fill="#0F172A" />
+          <circle cx="59" cy="52" r="2" fill="#FFFFFF" />
+          <circle cx="85" cy="52" r="2" fill="#FFFFFF" />
+          <circle cx="55.5" cy="56" r="1" fill="#FFFFFF" />
+          <circle cx="81.5" cy="56" r="1" fill="#FFFFFF" />
         </g>
 
-        {/* Cejas */}
-        <path
-          d={estado === 'thinking' ? 'M43 42C46 40 50 41 52 43' : 'M43 44C46 42 50 42 52 44'}
-          stroke="#B45309"
-          strokeWidth="2.3"
-          strokeLinecap="round"
+        {/* Gafas inteligentes sutiles de IA */}
+        <rect
+          x="47"
+          y="46"
+          width="20"
+          height="15"
+          rx="5"
+          stroke="#1E3A8A"
+          strokeWidth="2.2"
+          fill="rgba(56, 189, 248, 0.14)"
         />
-        <path
-          d={estado === 'thinking' ? 'M68 45C70 43 74 42 77 44' : 'M68 44C70 42 74 42 77 44'}
-          stroke="#B45309"
-          strokeWidth="2.3"
-          strokeLinecap="round"
+        <rect
+          x="73"
+          y="46"
+          width="20"
+          height="15"
+          rx="5"
+          stroke="#1E3A8A"
+          strokeWidth="2.2"
+          fill="rgba(56, 189, 248, 0.14)"
         />
+        <line x1="67" y1="53" x2="73" y2="53" stroke="#1E3A8A" strokeWidth="2.4" />
 
-        {/* Nariz */}
-        <ellipse cx="60" cy="61" rx="5.2" ry="3.8" fill="#081326" />
-        <ellipse cx="58.5" cy="59.8" rx="1.7" ry="1" fill="#64748B" />
+        {/* Nariz brillante */}
+        <ellipse cx="70" cy="65" rx="6.5" ry="4.6" fill="#0F172A" />
+        <ellipse cx="68" cy="63.5" rx="2.2" ry="1.2" fill="#94A3B8" />
 
-        {/* Boca y lengüita */}
+        {/* Sonrisa y lengüita */}
         <path
-          d="M52 68.5C55 72 65 72 68 68.5"
-          stroke="#081326"
-          strokeWidth="2.4"
+          d="M60 73.5C64 78 76 78 80 73.5"
+          stroke="#0F172A"
+          strokeWidth="2.8"
           strokeLinecap="round"
         />
         <path
           className="unimi-tongue"
-          d="M57 70.8C57 75.5 63 75.5 63 70.8"
+          d="M66 76.5C66 82.5 74 82.5 74 76.5"
           fill="#FB7185"
+          stroke="#BE123C"
+          strokeWidth="1.5"
         />
       </g>
 
-      {/* Lupa animada cuando está buscando en MongoDB / Gemini */}
-      {estado === 'thinking' && (
-        <g className="unimi-magnifier">
-          <circle cx="88" cy="70" r="10" fill="#0E1E38" stroke="#38BDF8" strokeWidth="3" />
-          <line
-            x1="95"
-            y1="77"
-            x2="103"
-            y2="85"
-            stroke="#FACC15"
-            strokeWidth="3.5"
-            strokeLinecap="round"
-          />
-        </g>
-      )}
+      {/* Patitas apoyadas adelante sobre el borde del botón */}
+      <ellipse
+        cx="52"
+        cy="118"
+        rx="10.5"
+        ry="7"
+        fill="#FBBF24"
+        stroke="#78350F"
+        strokeWidth="3"
+      />
+      <path d="M49 116V121M55 116V121" stroke="#78350F" strokeWidth="2" strokeLinecap="round" />
+
+      <ellipse
+        cx="88"
+        cy="118"
+        rx="10.5"
+        ry="7"
+        fill="#FBBF24"
+        stroke="#78350F"
+        strokeWidth="3"
+      />
+      <path d="M85 116V121M91 116V121" stroke="#78350F" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 };
+
+/* Avatar circular compacto para cabecera y mensajes dentro del chat */
+const AvatarChatUnimi: React.FC<{ className?: string; estado?: EstadoUnimi }> = ({
+  className = 'w-10 h-10',
+  estado = 'idle',
+}) => (
+  <div
+    className={`${className} rounded-full bg-[#0E1E38] border-2 border-yellow-400 flex items-center justify-center overflow-hidden shrink-0`}
+  >
+    <PerritoFlotanteUnimi className="w-full h-full scale-110 translate-y-0.5" estado={estado} />
+  </div>
+);
 
 const MENSAJE_INICIAL: MensajeChat = {
   id: 'bienvenida',
@@ -374,28 +389,31 @@ export const AsistenteIA: React.FC<AsistenteIAProps> = () => {
     activarSaludoBreve();
   };
 
-  const acariciarUnimi = () => {
-    if (cargando) return;
-    activarSaludoBreve();
-  };
-
   return (
     <>
       <style>{ESTILOS_UNIMI}</style>
 
+      {/* Botón flotante con perrito sobresaliendo por encima */}
       {!abierto && (
         <button
           onClick={() => {
             setAbierto(true);
             activarSaludoBreve();
           }}
-          title="Hablar con Unimi IA"
-          className="fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] right-4 sm:right-5 z-40 group flex items-center gap-2.5 pl-1.5 pr-4 py-1.5 rounded-full bg-yellow-400 hover:bg-yellow-300 text-zinc-950 font-extrabold text-xs sm:text-sm shadow-2xl shadow-black/60 border-2 border-zinc-900 transition-transform hover:scale-105 cursor-pointer"
+          title="Pregúntale a Unimi IA"
+          className="fixed bottom-[calc(1.15rem+env(safe-area-inset-bottom))] right-4 sm:right-5 z-40 group flex items-center cursor-pointer transition-transform hover:scale-105"
         >
-          <MascotaUnimi className="w-11 h-11 shrink-0" estado="idle" />
-          <div className="text-left leading-tight">
-            <span className="block font-extrabold">Unimi IA</span>
-            <span className="block text-[10px] font-semibold text-zinc-900/80">
+          {/* Mascota sobresaliendo a la izquierda y arriba */}
+          <div className="relative z-10 -mr-5 -mt-6 pointer-events-none drop-shadow-[0_8px_14px_rgba(0,0,0,0.65)]">
+            <PerritoFlotanteUnimi className="w-[74px] h-[74px] sm:w-[82px] sm:h-[82px]" estado="idle" />
+          </div>
+
+          {/* Píldora amarilla con patitas apoyadas */}
+          <div className="pl-7 pr-4 py-2.5 rounded-2xl bg-yellow-400 group-hover:bg-yellow-300 text-zinc-950 shadow-2xl shadow-black/70 border-2 border-zinc-950 text-left leading-tight">
+            <span className="block font-black text-xs sm:text-sm tracking-tight">
+              Pregúntale a Unimi
+            </span>
+            <span className="block text-[10px] sm:text-[11px] font-bold text-zinc-900/80">
               Asistente inteligente
             </span>
           </div>
@@ -407,12 +425,12 @@ export const AsistenteIA: React.FC<AsistenteIAProps> = () => {
           {/* Cabecera interactiva */}
           <div className="px-4 py-3 bg-zinc-950 border-b border-zinc-800 flex items-center justify-between gap-2">
             <div
-              onClick={acariciarUnimi}
+              onClick={() => !cargando && activarSaludoBreve()}
               title="¡Haz clic para saludar a Unimi!"
               className="flex items-center gap-2.5 min-w-0 cursor-pointer group"
             >
-              <MascotaUnimi
-                className="w-12 h-12 shrink-0 transition-transform group-hover:scale-105"
+              <AvatarChatUnimi
+                className="w-11 h-11 transition-transform group-hover:scale-105"
                 estado={estadoUnimi}
               />
               <div className="min-w-0">
@@ -424,7 +442,7 @@ export const AsistenteIA: React.FC<AsistenteIAProps> = () => {
                 </div>
                 <p className="text-[11px] text-zinc-400 truncate">
                   {cargando
-                    ? 'Buscando en inventario y alertas...'
+                    ? 'Rastreando inventario y alertas...'
                     : input.trim()
                       ? 'Escuchando tu consulta...'
                       : 'Asistente FindCampus • En línea'}
@@ -452,7 +470,7 @@ export const AsistenteIA: React.FC<AsistenteIAProps> = () => {
             </div>
           </div>
 
-          {/* Mensajes con avatar animado de Unimi en cada respuesta */}
+          {/* Mensajes */}
           <div className="p-4 space-y-3.5 overflow-y-auto flex-1 min-h-[260px] max-h-[54vh]">
             {mensajes.map((msg, idx) => {
               const esUltimoMensajeUnimi =
@@ -465,8 +483,8 @@ export const AsistenteIA: React.FC<AsistenteIAProps> = () => {
                   }`}
                 >
                   {msg.autor === 'unimi' && (
-                    <MascotaUnimi
-                      className="w-8 h-8 shrink-0 mb-0.5"
+                    <AvatarChatUnimi
+                      className="w-8 h-8 mb-0.5"
                       estado={esUltimoMensajeUnimi ? estadoUnimi : 'idle'}
                     />
                   )}
@@ -500,7 +518,7 @@ export const AsistenteIA: React.FC<AsistenteIAProps> = () => {
 
             {cargando && (
               <div className="flex items-end gap-2 justify-start">
-                <MascotaUnimi className="w-8 h-8 shrink-0 mb-0.5" estado="thinking" />
+                <AvatarChatUnimi className="w-8 h-8 mb-0.5" estado="thinking" />
                 <div className="bg-zinc-950 border border-zinc-800 rounded-2xl rounded-bl-sm px-3.5 py-2.5 text-xs text-zinc-400 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-yellow-400 animate-bounce" />
                   Unimi está revisando la base de datos...
