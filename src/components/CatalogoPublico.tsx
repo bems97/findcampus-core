@@ -153,7 +153,7 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
   const [busqueda, setBusqueda] = useState('');
   const [sedeFiltro, setSedeFiltro] = useState('Todas las sedes');
   const [categoriaFiltro, setCategoriaFiltro] = useState('Todas las categorías');
-  const [soloDisponibles, setSoloDisponibles] = useState(false);
+  const [incluirEntregados, setIncluirEntregados] = useState(false);
   const [faqAbierta, setFaqAbierta] = useState<number | null>(0);
 
   const [modalAlertaAbierto, setModalAlertaAbierto] = useState(false);
@@ -187,6 +187,14 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
 
   const objetosFiltrados = useMemo(() => {
     return objetos.filter((obj) => {
+      const yaEntregado =
+        obj.estado === 'RESTITUIDO' || (obj.estado as string) === 'ENTREGADO';
+
+      // Por defecto (y siempre para estudiantes salvo que activen el historial), ocultamos los ya entregados
+      if (yaEntregado && !incluirEntregados) {
+        return false;
+      }
+
       const coincideSede =
         sedeFiltro === 'Todas las sedes' ||
         obj.sede?.toLowerCase() === sedeFiltro.toLowerCase();
@@ -195,10 +203,8 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
         categoriaFiltro === 'Todas las categorías' ||
         obj.categoria?.toUpperCase() === categoriaFiltro.toUpperCase();
 
-      const coincideEstado = !soloDisponibles || obj.estado === 'EN_CUSTODIA';
-
       const q = busqueda.trim().toLowerCase();
-      if (!q) return coincideSede && coincideCategoria && coincideEstado;
+      if (!q) return coincideSede && coincideCategoria;
 
       const meta = (obj.atributos ||
         (obj as unknown as Record<string, unknown>).metadatos ||
@@ -217,14 +223,9 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
         .join(' ')
         .toLowerCase();
 
-      return (
-        coincideSede &&
-        coincideCategoria &&
-        coincideEstado &&
-        textoCompleto.includes(q)
-      );
+      return coincideSede && coincideCategoria && textoCompleto.includes(q);
     });
-  }, [objetos, busqueda, sedeFiltro, categoriaFiltro, soloDisponibles]);
+  }, [objetos, busqueda, sedeFiltro, categoriaFiltro, incluirEntregados]);
 
   const abrirModalAlerta = () => {
     setAlertaEnviadaCodigo(null);
@@ -404,17 +405,19 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
               </div>
             </div>
 
-            <div className="mt-4 flex items-center justify-end">
-              <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-300 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={soloDisponibles}
-                  onChange={(e) => setSoloDisponibles(e.target.checked)}
-                  className="rounded border-blue-800 text-yellow-400 focus:ring-yellow-400"
-                />
-                <span>Mostrar solo disponibles en custodia</span>
-              </label>
-            </div>
+            {esAdmin && (
+              <div className="mt-4 flex items-center justify-end">
+                <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-300 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={incluirEntregados}
+                    onChange={(e) => setIncluirEntregados(e.target.checked)}
+                    className="rounded border-blue-800 text-yellow-400 focus:ring-yellow-400"
+                  />
+                  <span>Incluir historial de bienes ya entregados</span>
+                </label>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -508,7 +511,7 @@ export const CatalogoPublico: React.FC<CatalogoPublicoProps> = ({
         <div className="rounded-3xl bg-[#0e1e38]/70 border border-blue-900/40 p-10 text-center space-y-4">
           <PackageSearch className="w-12 h-12 text-yellow-400 mx-auto" />
           <h3 className="text-lg font-bold text-white">
-            No encontramos objetos con esos criterios
+            No hay objetos disponibles en custodia con esos criterios
           </h3>
           <p className="text-sm text-slate-300 max-w-md mx-auto">
             Si tu pertenencia aún no ha sido entregada en portería, registra una alerta
